@@ -1,7 +1,3 @@
-#define INRANGE(x,a,b)		(x >= a && x <= b) 
-#define getBits( x )		(INRANGE(x,'0','9') ? (x - '0') : ((x&(~0x20)) - 'A' + 0xa))
-#define getByte( x )		(getBits(x[0]) << 4 | getBits(x[1]))
-
 #include <windows.h>
 #include <Psapi.h>
 
@@ -15,7 +11,7 @@ MODULEINFO GetModuleInfo(const LPCWSTR szModule)
 	return modinfo;
 }
 
-DWORD FindPattern(const LPCWSTR module, char *pattern, char *mask)
+DWORD FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
 {
 	//Get all module related information
 	const MODULEINFO mInfo = GetModuleInfo(module);
@@ -50,11 +46,35 @@ DWORD FindPattern(const LPCWSTR module, char *pattern, char *mask)
 	return NULL;
 }
 
-DWORD GetModuleSize(LPCWSTR szModule)
+void MakeJMP(BYTE* pAddress, void* dwJumpTo, const DWORD dwLen)
 {
-	MODULEINFO modinfo = { 0 };
-	HMODULE hModule = GetModuleHandle(szModule);
-	if (hModule == 0) return 0;
-	GetModuleInformation(GetCurrentProcess(), hModule, &modinfo, sizeof(MODULEINFO));
-	return modinfo.SizeOfImage;
+	DWORD dwOldProtect, dwBkup, dwRelAddr;
+
+	// give the paged memory read/write permissions
+
+	VirtualProtect(pAddress, dwLen, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+
+	// calculate the distance between our address and our target location
+	// and subtract the 5bytes, which is the size of the jmp
+	// (0xE9 0xAA 0xBB 0xCC 0xDD) = 5 bytes
+
+	dwRelAddr = (DWORD)((DWORD)dwJumpTo - (DWORD)pAddress) - 5;
+
+	// overwrite the byte at pAddress with the jmp opcode (0xE9)
+
+	*pAddress = 0xE9;
+
+	// overwrite the next 4 bytes (which is the size of a DWORD)
+	// with the dwRelAddr
+
+	*((DWORD *)(pAddress + 0x1)) = dwRelAddr;
+
+	// overwrite the remaining bytes with the NOP opcode (0x90)
+	// NOP opcode = No OPeration
+
+	for (DWORD x = 0x5; x < dwLen; x++) *(pAddress + x) = 0x90;
+
+	// restore the paged memory permissions saved in dwOldProtect
+
+	VirtualProtect(pAddress, dwLen, dwOldProtect, &dwBkup);
 }
