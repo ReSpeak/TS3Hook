@@ -1,7 +1,9 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
+﻿// dllmain.cpp : Defines the entry point for the DLL application.
 #include "main.h"
 #include <cstdio>
 #include "PatchTools.h"
+#include <iostream>
+#include <string>
 
 #ifdef ENV32
 const LPCWSTR mod = L"ts3client_win32.exe";
@@ -35,6 +37,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lp
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
+
 		printf("-==== TS3HOOK 1.0 ====-\n");
 		printf("-= Written by Splamy =-\n");
 
@@ -57,8 +60,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lp
 
 extern "C"
 {
-	const char* print_in_format = "[IN] %.*s\n";
-	const char* print_out_format = "[OT] %.*s\n";
+	const char* print_in_format = "[ IN] %.*s\n";
+	const char* print_out_format = "[OUT] %.*s\n";
 }
 
 #ifdef ENV32
@@ -100,7 +103,7 @@ void __declspec(naked) packet_in_hook1()
 		MOV ecx, [esi + 8]
 		SUB ecx, 11
 		PUSH ecx // len
-		PUSH print_in_format1
+		PUSH print_in_format
 		CALL printf
 		ADD esp, 12
 		POPAD
@@ -126,7 +129,7 @@ void __declspec(naked) packet_out_hook1()
 		MOV ecx, [edi + 4]
 		SUB ecx, 13
 		PUSH ecx // len
-		PUSH print_out_format1
+		PUSH print_out_format
 		CALL printf
 		ADD esp, 12
 		POPAD
