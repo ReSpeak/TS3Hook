@@ -2,5 +2,5 @@
 
 #include <windows.h>
 
-DWORD FindPattern(const LPCWSTR module, const char *pattern, const char *mask);
-void MakeJMP(BYTE* pAddress, void* dwJumpTo, DWORD dwLen);
+SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask);
+void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen);

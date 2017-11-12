@@ -1,0 +1,117 @@
+﻿using System;
+using System.IO;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Injector
+{
+	class Program
+	{
+		static void Main(string[] args)
+		{
+			DoHax();
+			Console.ReadKey();
+		}
+
+		static void DoHax()
+		{
+			Process proc;
+			var procs = Process.GetProcessesByName("ts3client_win64");
+			if (procs.Length == 0)
+			{
+				Console.WriteLine("No Proc found");
+				return;
+			}
+			else if (procs.Length == 1)
+			{
+				proc = procs[0];
+			}
+			else
+			{
+				Console.WriteLine("Select proc [0-{0}]", procs.Length - 1);
+				int index = int.Parse(Console.ReadLine());
+				proc = procs[index];
+			}
+
+			string res = DllInjector.Inject((uint)proc.Id, @"TS3Hook.dll");
+			Console.WriteLine("Status = {0}", res ?? "OK");
+			Console.WriteLine("Done");
+		}
+	}
+
+	public static class DllInjector
+	{
+		[DllImport("kernel32.dll")]
+		static extern int GetLastError();
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr OpenProcess(uint dwDesiredAccess, int bInheritHandle, uint dwProcessId);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern int CloseHandle(IntPtr hObject);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr GetModuleHandle(string lpModuleName);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr VirtualAllocEx(IntPtr hProcess, IntPtr lpAddress, IntPtr dwSize, uint flAllocationType, uint flProtect);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern int WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] buffer, uint size, int lpNumberOfBytesWritten);
+
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr lpThreadAttribute, IntPtr dwStackSize, IntPtr lpStartAddress,
+			IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
+
+		public static string Inject(uint pToBeInjected, string sDllPath)
+		{
+			IntPtr hndProc = OpenProcess((0x2 | 0x8 | 0x10 | 0x20 | 0x400), 1, pToBeInjected);
+
+			if (hndProc == IntPtr.Zero)
+			{
+				int errglc = GetLastError();
+				return $"hndProc is null ({errglc.ToString("X")})";
+			}
+
+			IntPtr lpLLAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
+			if (lpLLAddress == IntPtr.Zero)
+			{
+				return "lpLLAddress is null";
+			}
+
+			sDllPath = Path.GetFullPath(sDllPath);
+
+			IntPtr lpAddress = VirtualAllocEx(hndProc, (IntPtr)null, (IntPtr)sDllPath.Length, (0x1000 | 0x2000), 0X40);
+			if (lpAddress == IntPtr.Zero)
+			{
+				return "lpAddress is null";
+			}
+
+			byte[] bytes = Encoding.ASCII.GetBytes(sDllPath);
+
+			int errcode;
+			if ((errcode = WriteProcessMemory(hndProc, lpAddress, bytes, (uint)bytes.Length, 0)) == 0)
+			{
+				return $"WriteProcessMemory returned error: {errcode.ToString("X")}";
+			}
+
+			var ptr = CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, lpLLAddress, lpAddress, 0, IntPtr.Zero);
+			if (ptr == IntPtr.Zero)
+			{
+				int errglc = GetLastError();
+				return $"CreateRemoteThread returned error ({errglc.ToString("X")})";
+			}
+
+			CloseHandle(hndProc);
+
+			return null;
+		}
+	}
+}
