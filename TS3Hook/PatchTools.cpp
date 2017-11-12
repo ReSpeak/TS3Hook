@@ -94,20 +94,11 @@ void MakeJMP(PBYTE const pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00     // ptr
 	};
 
-	void* pTrampoline = VirtualAlloc(0, dwLen + sizeof(stub), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
 	DWORD dwOld = 0;
 	VirtualProtect(pAddress, dwLen, PAGE_EXECUTE_READWRITE, &dwOld);
 
-	// trampoline
-	memcpy(stub + 6, &dwJumpTo, 8);
-
-	memcpy((void*)((DWORD_PTR)pTrampoline), pAddress, dwLen);
-	memcpy((void*)((DWORD_PTR)pTrampoline + dwLen), stub, sizeof(stub));
-
-
 	// orig 
-	memcpy(stub + 6, &pTrampoline, 8);
+	memcpy(stub + 6, &dwJumpTo, 8);
 	memcpy(pAddress, stub, sizeof(stub));
 
 	for (int i = MinLen; i < dwLen; i++)

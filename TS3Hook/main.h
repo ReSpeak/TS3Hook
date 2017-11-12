@@ -28,14 +28,10 @@
 bool TryHook();
 void idle_loop();
 
-#ifdef ENV32
-void packet_in_hook1();
-void packet_out_hook1();
-#else
 extern "C"
 {
 	void packet_in_hook1();
+	void packet_out_hook1();
 }
-#endif
 
 #endif // MAIN_H

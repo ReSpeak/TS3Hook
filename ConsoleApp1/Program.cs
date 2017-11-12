@@ -72,6 +72,10 @@ namespace Injector
 
 		public static string Inject(uint pToBeInjected, string sDllPath)
 		{
+			sDllPath = Path.GetFullPath(sDllPath);
+			if (!File.Exists(sDllPath))
+				return "Hook file not found";
+
 			IntPtr hndProc = OpenProcess((0x2 | 0x8 | 0x10 | 0x20 | 0x400), 1, pToBeInjected);
 
 			if (hndProc == IntPtr.Zero)
@@ -85,8 +89,6 @@ namespace Injector
 			{
 				return "lpLLAddress is null";
 			}
-
-			sDllPath = Path.GetFullPath(sDllPath);
 
 			IntPtr lpAddress = VirtualAllocEx(hndProc, (IntPtr)null, (IntPtr)sDllPath.Length, (0x1000 | 0x2000), 0X40);
 			if (lpAddress == IntPtr.Zero)

@@ -18,6 +18,9 @@ const LPCWSTR mod = L"ts3client_win64.exe";
 
 const char* MASK_IN_1 = "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB";
 const char* PATT_IN_1 = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+const char* MASK_OUT_1 = "\x89\x45\x00\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x44\x80\x7C\x24\x40\x00";
+const char* PATT_OUT_1 = "xxxxxxxxxxxxxxxxxx";
 #endif
 
 // RUNTIME CALCED
@@ -141,10 +144,17 @@ bool TryHook()
 	if (match_in_1 != NULL)
 		printf("> Found PKGIN1: %zX\n", match_in_1);
 
-	if (match_in_1 != NULL)
+	const auto match_out_1 = FindPattern(mod, MASK_OUT_1, PATT_OUT_1);
+	if (match_out_1 != NULL)
+		printf("> Found PKGOUT1: %zX\n", match_out_1);
+
+	if (match_in_1 != NULL && match_out_1 != NULL)
 	{
 		packet_in_hook_return = match_in_1 + 22;
 		MakeJMP((PBYTE)(match_in_1), packet_in_hook1, 22);
+
+		packet_out_hook_return = match_out_1 + 18;
+		MakeJMP((PBYTE)(match_out_1), packet_out_hook1, 18);
 		return true;
 	}
 
