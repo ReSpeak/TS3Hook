@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27004.2008
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TS3Hook", "TS3Hook\TS3Hook.vcxproj", "{568E865A-1CFF-457E-823F-0239A23ED904}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Injector", "ConsoleApp1\Injector.csproj", "{3C292C14-45B3-4AEF-B332-60FB8C022D8F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Injector", "Injektor\Injector.csproj", "{3C292C14-45B3-4AEF-B332-60FB8C022D8F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

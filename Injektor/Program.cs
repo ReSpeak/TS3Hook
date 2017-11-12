@@ -1,16 +1,19 @@
 ﻿using System;
-using System.IO;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Injector
 {
 	class Program
 	{
+#if WIN32
+		const string procName = "ts3client_win32";
+#else
+		const string procName = "ts3client_win64";
+#endif
+
 		static void Main(string[] args)
 		{
 			DoHax();
@@ -20,7 +23,7 @@ namespace Injector
 		static void DoHax()
 		{
 			Process proc;
-			var procs = Process.GetProcessesByName("ts3client_win64");
+			var procs = Process.GetProcessesByName(procName);
 			if (procs.Length == 0)
 			{
 				Console.WriteLine("No Proc found");
