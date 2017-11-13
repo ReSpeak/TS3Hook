@@ -1,4 +1,4 @@
-C++ verison changes:
+C++ version changes:
 - 3.0.17	to version 120
 - 3.1		to Visual Studio 2015
 - 3.1.5		to 14.0.24215 (MSVC 2015-3)
