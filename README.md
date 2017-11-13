@@ -13,6 +13,11 @@ This is a hook that decrypts Teamspeak 3 command packets on the fly and displays
 5. Take a look at the console named `Teamspeak 3 Client`.
 6. Profit
 
+## Todo
+
+- Move the whole project to a TS3 Plugin so it gets auto-injected on client start.
+- Make it possible to inject (send) own commands.
+
 <details><summary>Screenshots</summary>
 
 ![](https://i.imgur.com/0Ez8OJ0.png)
