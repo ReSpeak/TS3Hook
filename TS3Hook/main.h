@@ -32,6 +32,19 @@ extern "C"
 {
 	void packet_in_hook1();
 	void packet_out_hook1();
+#ifdef ENV64
+	void packet_out_hook2();
+	void packet_out_hook3();
+#endif
 }
+
+const struct hookpt
+{
+	const SIZE_T hook_return_offset;
+	const SIZE_T hook_length;
+	void (*target_hook)();
+	const char* PATT;
+	const char* MASK;
+};
 
 #endif // MAIN_H

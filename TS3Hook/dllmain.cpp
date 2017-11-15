@@ -9,20 +9,25 @@
 const LPCWSTR mod = L"ts3client_win32.exe";
 
 // Ver: 3.1.6>3.1.4.2>3.0.17  !3.0.16
-const char* MASK_IN_1 = "\x8B\x4F\x3C\x6A\x00\xFF\x77\x44\xFF\x77\x40\x8B\x01\x57\x56\xFF\x50\x10";
-const char* PATT_IN_1 = "xxxxxxxxxxxxxxxxxx";
+const char* PATT_IN_1 = "\x8B\x4F\x3C\x6A\x00\xFF\x77\x44\xFF\x77\x40\x8B\x01\x57\x56\xFF\x50\x10";
+const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxx";
 
 // Ver: 3.1.6>3.1.4.2>3.1>?  !3.0.17
-const char* MASK_OUT_1 = "\xC6\x45\xFC\x06\x80\xF9\x02\x74\x09\x80\xF9\x03";
-const char* PATT_OUT_1 = "xxxxxxxxxxxx";
+const char* PATT_OUT_1 = "\xC6\x45\xFC\x06\x80\xF9\x02\x74\x09\x80\xF9\x03";
+const char* MASK_OUT_1 = "xxxxxxxxxxxx";
 #else
 const LPCWSTR mod = L"ts3client_win64.exe";
 
-const char* MASK_IN_1 = "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB";
-const char* PATT_IN_1 = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
+const char* PATT_IN_1 = "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB";
+const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
 
-const char* MASK_OUT_1 = "\x89\x45\x00\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x44\x80\x7C\x24\x40\x00";
-const char* PATT_OUT_1 = "xxxxxxxxxxxxxxxxxx";
+hookpt OUT_HOOKS[] = {
+	// "xx?xxxxxxxxx?xxxxx"
+	hookpt{ 18, 18, packet_out_hook1, "\x89\x45\x00\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x44\x80\x7C\x24\x40\x00" ,"xxxxxxxxxxxxxxxxxx" },
+	hookpt{ 18, 18, packet_out_hook2, "\x89\x45\xE0\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x50\x80\x7C\x24\x40\x00" ,"xxxxxxxxxxxxxxxxxx" },
+	hookpt{ 17, 17, packet_out_hook3, "\x48\x8B\x10\x48\x89\x54\x24\x50\x48\x89\x54\x24\x78\x48\x8B\x58\x08", "xxxxxxxxxxxxxxxxx" }
+
+};
 #endif
 
 // RUNTIME CALCED
@@ -43,8 +48,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lp
 
 		if (!TryHook())
 		{
-			printf("Packet dispatcher not found, aborting");
+			printf("Packet dispatcher not found, aborting\n");
 			return FALSE;
+		}
+		else
+		{
+			printf("Hook successful!\n");
 		}
 
 		CreateThread(nullptr, NULL, (LPTHREAD_START_ROUTINE)idle_loop, nullptr, NULL, nullptr);
@@ -67,11 +76,11 @@ extern "C"
 #ifdef ENV32
 bool TryHook()
 {
-	const auto match_in_1 = FindPattern(mod, MASK_IN_1, PATT_IN_1);
+	const auto match_in_1 = FindPattern(mod, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
 		printf("> Found PKGIN1: %zX\n", match_in_1);
 
-	const auto match_out_1 = FindPattern(mod, MASK_OUT_1, PATT_OUT_1);
+	const auto match_out_1 = FindPattern(mod, PATT_OUT_1, MASK_OUT_1);
 	if (match_out_1 != NULL)
 		printf("> Found PKGOUT1: %zX\n", match_out_1);
 
@@ -138,26 +147,34 @@ void __declspec(naked) packet_out_hook1()
 		CMP DWORD PTR[ebp + 16], 1
 		SETZ BYTE PTR[ebp + 4]
 		JMP packet_out_hook_return
-	}
+}
 }
 #else
 bool TryHook()
 {
-	const auto match_in_1 = FindPattern(mod, MASK_IN_1, PATT_IN_1);
+	const auto match_in_1 = FindPattern(mod, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
-		printf("> Found PKGIN1: %zX\n", match_in_1);
+		printf("> Found PKGIN: %zX\n", match_in_1);
+	
+	SIZE_T match_out = NULL;
+	hookpt* pt_out = nullptr;
+	for (hookpt &pt : OUT_HOOKS)
+	{
+		match_out = FindPattern(mod, pt.PATT, pt.MASK);
+		if (match_out != NULL) {
+			pt_out = &pt;
+			printf("> Found PKGOUT: %zX\n", match_out);
+			break;
+		}
+	}
 
-	const auto match_out_1 = FindPattern(mod, MASK_OUT_1, PATT_OUT_1);
-	if (match_out_1 != NULL)
-		printf("> Found PKGOUT1: %zX\n", match_out_1);
-
-	if (match_in_1 != NULL && match_out_1 != NULL)
+	if (match_in_1 != NULL && match_out != NULL)
 	{
 		packet_in_hook_return = match_in_1 + 22;
 		MakeJMP((PBYTE)(match_in_1), packet_in_hook1, 22);
 
-		packet_out_hook_return = match_out_1 + 18;
-		MakeJMP((PBYTE)(match_out_1), packet_out_hook1, 18);
+		packet_out_hook_return = match_out + pt_out->hook_return_offset;
+		MakeJMP((PBYTE)(match_out), pt_out->target_hook, pt_out->hook_length);
 		return true;
 	}
 

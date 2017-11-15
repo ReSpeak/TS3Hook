@@ -22,19 +22,29 @@ namespace Injector
 
 		static void DoHax()
 		{
-			Process proc;
-			var procs = Process.GetProcessesByName(procName);
-			if (procs.Length == 0)
+			Process[] procs;
+			do
 			{
-				Console.WriteLine("No Proc found");
-				return;
-			}
-			else if (procs.Length == 1)
+				procs = Process.GetProcessesByName(procName);
+				if (procs.Length == 0)
+				{
+					Console.WriteLine("No Process found");
+					System.Threading.Thread.Sleep(1000);
+				}
+			} while (procs.Length == 0);
+
+			Process proc;
+			if (procs.Length == 1)
 			{
 				proc = procs[0];
 			}
 			else
 			{
+				for (int i = 0; i < procs.Length; i++)
+				{
+					Console.WriteLine("[{0}] TeamSpeak 3 ({1})", i, procs[i].MainModule.FileVersionInfo.FileVersion);
+				}
+
 				Console.WriteLine("Select proc [0-{0}]", procs.Length - 1);
 				int index = int.Parse(Console.ReadLine());
 				proc = procs[index];

@@ -12,80 +12,80 @@ EXTERN packet_out_hook_return: QWORD
 PUBLIC packet_in_hook1
 
 pushaq macro
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push rbp
-	push rsi
-	push rdi
-	push r8
-	push r9
-	push r10
-	push r11
-	push r12
-	push r13
-	push r14
-	push r15
+	PUSH    rax
+	PUSH    rbx
+	PUSH    rcx
+	PUSH    rdx
+	PUSH    rbp
+	PUSH    rsi
+	PUSH    rdi
+	PUSH    r8
+	PUSH    r9
+	PUSH    r10
+	PUSH    r11
+	PUSH    r12
+	PUSH    r13
+	PUSH    r14
+	PUSH    r15
 endm
 
 popaq macro
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop r11
-	pop r10
-	pop r9
-	pop r8
-	pop rdi
-	pop rsi
-	pop rbp
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
+	POP     r15
+	POP     r14
+	POP     r13
+	POP     r12
+	POP     r11
+	POP     r10
+	POP     r9
+	POP     r8
+	POP     rdi
+	POP     rsi
+	POP     rbp
+	POP     rdx
+	POP     rcx
+	POP     rbx
+	POP     rax
 endm
 
 packet_in_hook1 proc
 	; Restore origial
-	mov     rcx, [r14+80]
-	mov     rax, [rcx]
-	mov     byte ptr [rsp+32], 0
-	mov     r9, [r14+88]
-	mov     r8, r14
-	mov     rdx, rbx
+	MOV     rcx, [r14+80]
+	MOV     rax, [rcx]
+	MOV     byte ptr [rsp+32], 0
+	MOV     r9, [r14+88]
+	MOV     r8, r14
+	MOV     rdx, rbx
 
 	pushaq
-	sub rsp, 32
+	SUB rsp, 32
 
 	; Log in-packet
-	MOV r8, QWORD PTR [rdx+8]
-	ADD r8, 11 ; str
-	MOV edx, DWORD PTR [rdx+16]
-	SUB edx, 11 ; len
-	MOV rcx, print_in_format
-	call printf
+	MOV     r8, QWORD PTR [rdx+8]
+	ADD     r8, 11 ; str
+	MOV     edx, DWORD PTR [rdx+16]
+	SUB     edx, 11 ; len
+	MOV     rcx, print_in_format
+	CALL    printf
 
-	add rsp, 32
+	ADD rsp, 32
 	popaq
 
-	jmp packet_in_hook_return
+	JMP     packet_in_hook_return
 packet_in_hook1 endp
 
 packet_out_hook1 proc
 	pushaq
-	sub rsp, 32
+	SUB rsp, 32
 
 	; Log out-packet
-	MOV r8, QWORD PTR [rdi]
-	ADD r8, 13 ; str
-	MOV edx, DWORD PTR [rdi+8]
-	SUB edx, 13 ; len
-	MOV rcx, print_out_format
-	call printf
+	MOV     r8, QWORD PTR [rdi]
+	ADD     r8, 13 ; str
+	MOV     edx, DWORD PTR [rdi+8]
+	SUB     edx, 13 ; len
+	MOV     rcx, print_out_format
+	CALL    printf
 
-	add rsp, 32
+	ADD rsp, 32
 	popaq
 
 	; Restore origial
@@ -93,9 +93,65 @@ packet_out_hook1 proc
 	CMP     eax, 1
 	SETZ    cl
 	MOV     [rsp+68], cl
-	CMP     byte ptr [rsp+64], 0
+	CMP     BYTE PTR [rsp+64], 0
 
-	jmp packet_out_hook_return
+	JMP     packet_out_hook_return
 packet_out_hook1 endp
+
+packet_out_hook2 proc
+	pushaq
+	SUB     rsp, 32
+
+	; Log out-packet
+	MOV     r8, QWORD PTR [rdi]
+	ADD     r8, 13 ; str
+	MOV     edx, DWORD PTR [rdi+8]
+	SUB     edx, 13 ; len
+	MOV     rcx, print_out_format
+	CALL    printf
+
+	ADD rsp, 32
+	popaq
+
+	; Restore origial
+	MOV     [rbp-32], eax
+	CMP     eax, 1
+	SETZ    cl
+	MOV     [rsp+80], cl
+	CMP     BYTE PTR [rsp+64], 0
+
+	JMP     packet_out_hook_return
+packet_out_hook2 endp
+
+packet_out_hook3 proc
+	; Restore origial
+	MOV     rdx, [rax]
+	MOV     [rsp+80], rdx
+	MOV     [rsp+120], rdx
+	MOV     rbx, [rax+8]
+
+	pushaq
+
+	LEA     eax, [rdi-2]
+	CMP     al, 1
+	JA      _skip_packet
+	TEST    r9b, r9b
+	JNZ     _skip_packet
+
+	SUB     rsp, 32
+	; Log out-packet
+	MOV     r8, QWORD PTR [rsi]
+	ADD     r8, 13 ; str
+	MOV     edx, DWORD PTR [rsi+8]
+	SUB     edx, 13 ; len
+	MOV     rcx, print_out_format
+	CALL    printf
+	ADD     rsp, 32
+
+	_skip_packet:
+	popaq
+
+	JMP     packet_out_hook_return
+packet_out_hook3 endp
 
 END
