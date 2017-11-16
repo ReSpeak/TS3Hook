@@ -3,9 +3,8 @@
 
 .code
 
-EXTERN printf: PROC
-EXTERN print_in_format: QWORD
-EXTERN print_out_format: QWORD
+EXTERN log_in_packet: PROC
+EXTERN log_out_packet: PROC
 EXTERN packet_in_hook_return: QWORD
 EXTERN packet_out_hook_return: QWORD
 
@@ -60,12 +59,11 @@ packet_in_hook1 proc
 	SUB rsp, 32
 
 	; Log in-packet
-	MOV     r8, QWORD PTR [rdx+8]
-	ADD     r8, 11 ; str
+	MOV     rcx, QWORD PTR [rdx+8]
+	ADD     rcx, 11 ; str
 	MOV     edx, DWORD PTR [rdx+16]
 	SUB     edx, 11 ; len
-	MOV     rcx, print_in_format
-	CALL    printf
+	CALL    log_in_packet
 
 	ADD rsp, 32
 	popaq
@@ -78,12 +76,11 @@ packet_out_hook1 proc
 	SUB rsp, 32
 
 	; Log out-packet
-	MOV     r8, QWORD PTR [rdi]
-	ADD     r8, 13 ; str
+	MOV     rcx, QWORD PTR [rdi]
+	ADD     rcx, 13 ; str
 	MOV     edx, DWORD PTR [rdi+8]
 	SUB     edx, 13 ; len
-	MOV     rcx, print_out_format
-	CALL    printf
+	CALL    log_out_packet
 
 	ADD rsp, 32
 	popaq
@@ -103,12 +100,11 @@ packet_out_hook2 proc
 	SUB     rsp, 32
 
 	; Log out-packet
-	MOV     r8, QWORD PTR [rdi]
-	ADD     r8, 13 ; str
+	MOV     rcx, QWORD PTR [rdi]
+	ADD     rcx, 13 ; str
 	MOV     edx, DWORD PTR [rdi+8]
 	SUB     edx, 13 ; len
-	MOV     rcx, print_out_format
-	CALL    printf
+	CALL    log_out_packet
 
 	ADD rsp, 32
 	popaq
@@ -139,13 +135,14 @@ packet_out_hook3 proc
 	JNZ     _skip_packet
 
 	SUB     rsp, 32
+
 	; Log out-packet
-	MOV     r8, QWORD PTR [rsi]
-	ADD     r8, 13 ; str
+	MOV     rcx, QWORD PTR [rsi]
+	ADD     rcx, 13 ; str
 	MOV     edx, DWORD PTR [rsi+8]
 	SUB     edx, 13 ; len
-	MOV     rcx, print_out_format
-	CALL    printf
+	CALL    log_out_packet
+
 	ADD     rsp, 32
 
 	_skip_packet:

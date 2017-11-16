@@ -30,6 +30,8 @@ hookpt OUT_HOOKS[] = {
 };
 #endif
 
+HANDLE hConsole = NULL;
+
 // RUNTIME CALCED
 extern "C"
 {
@@ -43,18 +45,29 @@ BOOL APIENTRY DllMain(HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lp
 	{
 	case DLL_PROCESS_ATTACH:
 
+		hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+		if (hConsole != NULL)
+			SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 		printf("-==== TS3HOOK 1.0 ====-\n");
 		printf("-= Written by Splamy =-\n");
 
 		if (!TryHook())
 		{
+			if (hConsole != NULL)
+				SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
 			printf("Packet dispatcher not found, aborting\n");
 			return FALSE;
 		}
 		else
 		{
+			if (hConsole != NULL)
+				SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 			printf("Hook successful!\n");
 		}
+
+		if (hConsole != NULL)
+			SetConsoleTextAttribute(hConsole, 0);
 
 		CreateThread(nullptr, NULL, (LPTHREAD_START_ROUTINE)idle_loop, nullptr, NULL, nullptr);
 		break;
@@ -67,10 +80,18 @@ BOOL APIENTRY DllMain(HMODULE hModule, const DWORD ul_reason_for_call, LPVOID lp
 	return TRUE;
 }
 
-extern "C"
+void log_in_packet(char* packet, int length)
 {
-	const char* print_in_format = "[ IN] %.*s\n";
-	const char* print_out_format = "[OUT] %.*s\n";
+	if (hConsole != NULL)
+		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	printf("[ IN] %.*s\n", length, packet);
+}
+
+void log_out_packet(char* packet, int length)
+{
+	if (hConsole != NULL)
+		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	printf("[OUT] %.*s\n", length, packet);
 }
 
 #ifdef ENV32
@@ -147,7 +168,7 @@ void __declspec(naked) packet_out_hook1()
 		CMP DWORD PTR[ebp + 16], 1
 		SETZ BYTE PTR[ebp + 4]
 		JMP packet_out_hook_return
-}
+	}
 }
 #else
 bool TryHook()
@@ -155,7 +176,7 @@ bool TryHook()
 	const auto match_in_1 = FindPattern(mod, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
 		printf("> Found PKGIN: %zX\n", match_in_1);
-	
+
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
 	for (hookpt &pt : OUT_HOOKS)

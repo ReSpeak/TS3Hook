@@ -30,6 +30,9 @@ void idle_loop();
 
 extern "C"
 {
+	void log_in_packet(char* packet, int length);
+	void log_out_packet(char* packet, int length);
+
 	void packet_in_hook1();
 	void packet_out_hook1();
 #ifdef ENV64
