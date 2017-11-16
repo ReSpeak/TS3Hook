@@ -56,7 +56,8 @@ namespace Injector
 		}
 	}
 
-	public static class DllInjector
+    //[System.Security.Permissions.PrincipalPermission(System.Security.Permissions.SecurityAction.Demand, Role = @"BUILTIN\Administrators")]
+    public static class DllInjector
 	{
 		[DllImport("kernel32.dll")]
 		static extern int GetLastError();
