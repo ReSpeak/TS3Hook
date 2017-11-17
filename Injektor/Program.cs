@@ -50,7 +50,7 @@ namespace Injector
 				proc = procs[index];
 			}
 
-			string res = DllInjector.Inject((uint)proc.Id, @"TS3Hook.dll");
+			string res = DllInjector.Inject(proc, @"TS3Hook.dll");
 			Console.WriteLine("Status = {0}", res ?? "OK");
 			Console.WriteLine("Done");
 		}
@@ -77,19 +77,22 @@ namespace Injector
 		static extern IntPtr VirtualAllocEx(IntPtr hProcess, IntPtr lpAddress, IntPtr dwSize, uint flAllocationType, uint flProtect);
 
 		[DllImport("kernel32.dll", SetLastError = true)]
-		static extern int WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] buffer, uint size, int lpNumberOfBytesWritten);
+		static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] buffer, uint size, int lpNumberOfBytesWritten);
 
 		[DllImport("kernel32.dll", SetLastError = true)]
 		static extern IntPtr CreateRemoteThread(IntPtr hProcess, IntPtr lpThreadAttribute, IntPtr dwStackSize, IntPtr lpStartAddress,
 			IntPtr lpParameter, uint dwCreationFlags, IntPtr lpThreadId);
 
-		public static string Inject(uint pToBeInjected, string sDllPath)
+		[DllImport("kernel32.dll", SetLastError = true)]
+		static extern IntPtr LoadLibrary([In] string lpFileName);
+
+		public static string Inject(Process proc, string sDllPath)
 		{
 			sDllPath = Path.GetFullPath(sDllPath);
 			if (!File.Exists(sDllPath))
 				return "Hook file not found";
 
-			IntPtr hndProc = OpenProcess((0x2 | 0x8 | 0x10 | 0x20 | 0x400), 1, pToBeInjected);
+			IntPtr hndProc = OpenProcess((0x2 | 0x8 | 0x10 | 0x20 | 0x400), 1, (uint)proc.Id);
 
 			if (hndProc == IntPtr.Zero)
 			{
@@ -110,11 +113,10 @@ namespace Injector
 			}
 
 			byte[] bytes = Encoding.ASCII.GetBytes(sDllPath);
-
-			int errcode;
-			if ((errcode = WriteProcessMemory(hndProc, lpAddress, bytes, (uint)bytes.Length, 0)) == 0)
+			if (!WriteProcessMemory(hndProc, lpAddress, bytes, (uint)bytes.Length, 0))
 			{
-				return $"WriteProcessMemory returned error: {errcode.ToString("X")}";
+				int errglc = GetLastError();
+				return $"WriteProcessMemory failed error: {errglc.ToString("X")}";
 			}
 
 			var ptr = CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, lpLLAddress, lpAddress, 0, IntPtr.Zero);
@@ -124,9 +126,33 @@ namespace Injector
 				return $"CreateRemoteThread returned error ({errglc.ToString("X")})";
 			}
 
+			for (int i = 0; i < 10; i++)
+			{
+				proc.Refresh();
+				foreach (ProcessModule item in proc.Modules)
+				{
+					if (item.ModuleName == "TS3Hook.dll")
+					{
+						var hookptr = LoadLibrary(sDllPath);
+						IntPtr plug_entry = GetProcAddress(hookptr, "ts3plugin_init");
+						long diff = plug_entry.ToInt64() - hookptr.ToInt64();
+						IntPtr finptr = (IntPtr)(item.BaseAddress.ToInt64() + diff);
+
+						if (CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, finptr, IntPtr.Zero, 0, IntPtr.Zero) == IntPtr.Zero)
+						{
+							return "Starting target routine failed";
+						}
+
+						return null;
+					}
+				}
+				Console.WriteLine("Searching for library...");
+				System.Threading.Thread.Sleep(500);
+			}
+
 			CloseHandle(hndProc);
 
-			return null;
+			return "Could not find library!";
 		}
 	}
 }
