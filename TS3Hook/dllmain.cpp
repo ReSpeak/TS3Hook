@@ -80,11 +80,11 @@ void log_out_packet(char* packet, int length)
 #ifdef ENV32
 bool TryHook()
 {
-	const auto match_in_1 = FindPattern(mod, PATT_IN_1, MASK_IN_1);
+	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
 		printf("> Found PKGIN1: %zX\n", match_in_1);
 
-	const auto match_out_1 = FindPattern(mod, PATT_OUT_1, MASK_OUT_1);
+	const auto match_out_1 = FindPattern(MOD, PATT_OUT_1, MASK_OUT_1);
 	if (match_out_1 != NULL)
 		printf("> Found PKGOUT1: %zX\n", match_out_1);
 
