@@ -1,0 +1,45 @@
+sudo: false
+language: csharp
+
+notifications:
+  email: false
+
+branches:
+  only:
+    - master
+
+addons:
+  apt:
+    packages:
+    - zip
+    - gzip
+    - tar
+    - curl
+	- git
+	- python3
+
+git:
+  depth: 9999999
+
+install:
+  - nuget restore TS3Hook.sln
+
+script:
+  - cfg="/p:Configuration=Release TS3Hook.sln"
+  - if command -v msbuild; then
+      msbuild $cfg;
+    elif command -v xbuild; then
+      xbuild $cfg;
+    else
+      echo "No mono build tool found!";
+      false;
+    fi
+
+after_success:
+  - export MAIN_DIR=`pwd`
+  - git clone https://github.com/svenpaulsen/ts3client-addontools
+  - cd ./TS3Hook/x64/bin/Release
+  - echo "https://gist.github.com/caspyin/2288960"
+  - zip TS3Hook.ts3_plugin TS3Hook_x64.dll TS3Hook_x86.dll
+  - "curl -I -H \"Content-Type: application/zip\" -X PUT \"https://splamy.de/api/nightly/ts3hook/${TRAVIS_BRANCH}?token=${uploadkey}&filename=TS3Hook.ts3_plugin&commit=${TRAVIS_COMMIT}&version=${version:9}\" --upload-file ./TS3Hook.ts3_plugin"
+  - cd "$MAIN_DIR"
