@@ -2,6 +2,8 @@
 #include "main.h"
 #include "PatchTools.h"
 
+#define PLUGIN_API_VERSION 22
+
 const char* ts3plugin_name() { return "TS3Hook"; }
 const char* ts3plugin_version() { return "1.0"; }
 
@@ -17,19 +19,22 @@ int ts3plugin_apiVersion() {
 
 	if (match == NULL)
 	{
-		printf("Cannot auto-dedect version\n");
+		printf("%s: Cannot auto-detect required PluginAPI version, using %d\n", ts3plugin_name(), PLUGIN_API_VERSION);
 		return 22;
 	}
 
-	printf("Client expects PluginAPI %d\n", target);
+	printf("%s: Auto-detected required PluginAPI %d\n", ts3plugin_name(), target);
 	return target;
 }
 
 const char* ts3plugin_author() { return "Splamy"; }
-const char* ts3plugin_description() { return "Prints command packets on the console."; }
+const char* ts3plugin_description() { return "Prints command packets on the console.\n\nhttps://github.com/ReSpeak/TS3Hook"; }
 void ts3plugin_setFunctionPointers(void* funcs) { }
 
-int ts3plugin_init() { return CoreHook() ? 0 : 1; }
+int ts3plugin_init() {
+	printf("%s v%s loading in plugin mode\n", ts3plugin_name(), ts3plugin_version());
+	return CoreHook() ? 0 : 1;
+}
 void ts3plugin_shutdown() {
-	printf("shutdown tshook");
+	printf("%s: Shutting down", ts3plugin_name());
 }
