@@ -21,7 +21,7 @@ int ts3plugin_apiVersion() {
 		return 22;
 	}
 
-	printf("Client expects %d\n", target);
+	printf("Client expects PluginAPI %d\n", target);
 	return target;
 }
 
