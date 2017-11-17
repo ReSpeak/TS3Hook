@@ -2,7 +2,7 @@
 
 ## What is this?
 
-This is a hook that decrypts Teamspeak 3 command packets on the fly and displays them in Teamspeak's own Console.
+This is a TS3Client Plugin that decrypts Teamspeak 3 command packets on the fly and displays them in Teamspeak's own Console.
 
 ## How to use
 
@@ -14,7 +14,6 @@ This is a hook that decrypts Teamspeak 3 command packets on the fly and displays
 
 ## Todo
 
-- Move the whole project to a TS3 Plugin so it gets auto-injected on client start.
 - Make it possible to inject (send) own commands.
 
 <details><summary>Screenshots</summary>
