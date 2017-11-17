@@ -163,6 +163,7 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="PatchTools.cpp" />
+    <ClCompile Include="Ts3Plugin.cpp" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="asmhook.asm">

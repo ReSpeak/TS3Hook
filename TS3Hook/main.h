@@ -25,8 +25,15 @@
 #endif
 
 // FUNCTION DECLS
+bool CoreHook();
 bool TryHook();
 void idle_loop();
+
+#ifdef ENV32
+#define MOD (L"ts3client_win32.exe")
+#else
+#define MOD (L"ts3client_win64.exe")
+#endif
 
 extern "C"
 {
@@ -49,5 +56,20 @@ const struct hookpt
 	const char* PATT;
 	const char* MASK;
 };
+
+#define PLUGINS_EXPORTDLL __declspec(dllexport)
+
+// Plugin exports
+extern "C" {
+	/* Required functions */
+	PLUGINS_EXPORTDLL const char* ts3plugin_name();
+	PLUGINS_EXPORTDLL const char* ts3plugin_version();
+	PLUGINS_EXPORTDLL int ts3plugin_apiVersion();
+	PLUGINS_EXPORTDLL const char* ts3plugin_author();
+	PLUGINS_EXPORTDLL const char* ts3plugin_description();
+	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(void* funcs);
+	PLUGINS_EXPORTDLL int ts3plugin_init();
+	PLUGINS_EXPORTDLL void ts3plugin_shutdown();
+}
 
 #endif // MAIN_H
