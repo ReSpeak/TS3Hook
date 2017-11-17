@@ -15,8 +15,8 @@ addons:
     - gzip
     - tar
     - curl
-	- git
-	- python3
+    - git
+    - python3
 
 git:
   depth: 9999999
@@ -35,7 +35,7 @@ script:
       false;
     fi
 
-after_success:
+after_success:    
   - export MAIN_DIR=`pwd`
   - git clone https://github.com/svenpaulsen/ts3client-addontools
   - cd ./TS3Hook/x64/bin/Release
