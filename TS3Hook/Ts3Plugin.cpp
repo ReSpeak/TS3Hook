@@ -34,9 +34,8 @@ const char* ts3plugin_description() { return "Prints command packets on the cons
 void ts3plugin_setFunctionPointers(void* funcs) { }
 
 int ts3plugin_init() {
-	printf("%s v%s loading in plugin mode\n", ts3plugin_name(), ts3plugin_version());
 	return CoreHook() ? 0 : 1;
 }
 void ts3plugin_shutdown() {
-	printf("%s: Shutting down", ts3plugin_name());
+	printf("%s: Shutting down\n", ts3plugin_name());
 }
