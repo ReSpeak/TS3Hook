@@ -18,3 +18,8 @@ xxxxxxxxxxxxxxxxxxxxxxxxxx
 
 TODO:
 setwhisperlist
+
+<details><summary>Latest Downloads</summary>
+
+[![](https://img.shields.io/github/downloads/ReSpeak/TS3Hook/latest/TS3Hook.ts3_plugin.svg?style=flat-square)]()  [![](https://img.shields.io/github/downloads/ReSpeak/TS3Hook/latest/Injector.x86.zip.svg?style=flat-square)]()  [![](https://img.shields.io/github/downloads/ReSpeak/TS3Hook/latest/Injector.x64.zip.svg?style=flat-square)]()
+</details>
