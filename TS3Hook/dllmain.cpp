@@ -116,9 +116,8 @@ void __declspec(naked) packet_in_hook1()
 		MOV ecx, [esi + 8]
 		SUB ecx, 11
 		PUSH ecx // len
-		PUSH print_in_format
-		CALL printf
-		ADD esp, 12
+		CALL log_in_packet
+		ADD esp, 8
 		POPAD
 
 		// overwritten
@@ -142,9 +141,8 @@ void __declspec(naked) packet_out_hook1()
 		MOV ecx, [edi + 4]
 		SUB ecx, 13
 		PUSH ecx // len
-		PUSH print_out_format
-		CALL printf
-		ADD esp, 12
+		CALL log_out_packet
+		ADD esp, 8
 		POPAD
 
 		// overwritten
