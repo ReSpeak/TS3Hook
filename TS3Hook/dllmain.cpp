@@ -6,6 +6,8 @@
 #include <string>
 
 #ifdef ENV32
+#define STD_DECL __cdecl
+
 // Ver: 3.1.6>3.1.4.2>3.0.17  !3.0.16
 const char* PATT_IN_1 = "\x8B\x4F\x3C\x6A\x00\xFF\x77\x44\xFF\x77\x40\x8B\x01\x57\x56\xFF\x50\x10";
 const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxx";
@@ -14,6 +16,8 @@ const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxx";
 const char* PATT_OUT_1 = "\xC6\x45\xFC\x06\x80\xF9\x02\x74\x09\x80\xF9\x03";
 const char* MASK_OUT_1 = "xxxxxxxxxxxx";
 #else
+#define STD_DECL
+
 const char* PATT_IN_1 = "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB";
 const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
 
@@ -63,14 +67,14 @@ bool CoreHook()
 	return true;
 }
 
-void log_in_packet(char* packet, int length)
+void STD_DECL log_in_packet(char* packet, int length)
 {
 	if (hConsole != NULL)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("[ IN] %.*s\n", length, packet);
 }
 
-void log_out_packet(char* packet, int length)
+void STD_DECL log_out_packet(char* packet, int length)
 {
 	if (hConsole != NULL)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
@@ -110,12 +114,12 @@ void __declspec(naked) packet_in_hook1()
 		// +11
 
 		PUSHAD
-		MOV eax, [esi + 4]
-		ADD eax, 11
-		PUSH eax // str
 		MOV ecx, [esi + 8]
 		SUB ecx, 11
 		PUSH ecx // len
+		MOV eax, [esi + 4]
+		ADD eax, 11
+		PUSH eax // str
 		CALL log_in_packet
 		ADD esp, 8
 		POPAD
@@ -135,12 +139,12 @@ void __declspec(naked) packet_out_hook1()
 		// +13
 
 		PUSHAD
-		MOV eax, [edi]
-		ADD eax, 13
-		PUSH eax // str
 		MOV ecx, [edi + 4]
 		SUB ecx, 13
 		PUSH ecx // len
+		MOV eax, [edi]
+		ADD eax, 13
+		PUSH eax // str
 		CALL log_out_packet
 		ADD esp, 8
 		POPAD

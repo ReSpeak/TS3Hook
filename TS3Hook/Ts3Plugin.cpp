@@ -11,16 +11,18 @@ int ts3plugin_apiVersion() {
 	int target = -1;
 	SIZE_T match = NULL;
 
+#ifdef ENV64
 	if (match == NULL && (match = FindPattern(MOD, "\x89\x83\x00\x04\x00\x00\x83\xC0?\x83\xF8\x01\x0F\x87", "xxxxxxxx?xxxxx")))
 		target = abs((int)(*(signed char*)(match + 8)));
 
 	if (match == NULL && (match = FindPattern(MOD, "\x89\x83??\x00\x00\x83\xF8?\x0F\x84", "xx??xxxx?xx")))
 		target = abs((int)(*(signed char*)(match + 8)));
+#endif
 
 	if (match == NULL)
 	{
 		printf("%s: Cannot auto-detect required PluginAPI version, using %d\n", ts3plugin_name(), PLUGIN_API_VERSION);
-		return 22;
+		return PLUGIN_API_VERSION;
 	}
 
 	printf("%s: Auto-detected required PluginAPI %d\n", ts3plugin_name(), target);
