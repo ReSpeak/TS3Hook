@@ -2,31 +2,23 @@
 
 ## What is this?
 
-This is a hook that decrypts Teamspeak 3 command packets on the fly and displays them in Teamspeak's own Console.
+This is a TS3Client Plugin that decrypts Teamspeak 3 command packets on the fly and displays them in Teamspeak's own Console.
 
 ## How to use
 
-1. Download and install the [latest release](https://github.com/ReSpeak/TS3Hook/releases/latest) for your client's architecture.
+1. Download and install the [latest release](https://github.com/ReSpeak/TS3Hook/releases/latest) for your client.
 2. Add `-console` to the startup parameters of your TS3Client shortcut. ([Screenshot](https://i.imgur.com/a5HgomX.png))
-3. Start `Injector.exe` as admin.
-4. (If asked enter the ID of the running client.)
-5. Take a look at the console named `Teamspeak 3 Client`.
-6. Profit
+3. Start your Teamspeak 3 Client with the modified shortcut.
+4. Take a look at the console named `Teamspeak 3 Client`.
+5. Profit
+
+NOTE: You can also inject the DLL with the injector of the latest release.
 
 ## Todo
 
-- Move the whole project to a TS3 Plugin so it gets auto-injected on client start.
 - Make it possible to inject (send) own commands.
 
 <details><summary>Screenshots</summary>
 
-![](https://i.imgur.com/0Ez8OJ0.png)
-![](https://i.imgur.com/fNG7LYj.png)
-
-</details>
-<details><summary>Latest Downloads</summary>
-
-32bit | 64bit
-|:--:|:--:|
-[![](https://img.shields.io/github/downloads/ReSpeak/TS3Hook/latest/TS3Hook.x86.zip.svg?style=flat-square)]() | [![](https://img.shields.io/github/downloads/ReSpeak/TS3Hook/latest/TS3Hook.x64.zip.svg?style=flat-square)]()
-</details>
+![](https://i.imgur.com/uBjPUcc.png)
+![](https://i.imgur.com/0ZlwlQO.png)
