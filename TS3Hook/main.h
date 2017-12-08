@@ -25,9 +25,10 @@
 #endif
 
 // FUNCTION DECLS
-bool CoreHook();
-bool TryHook();
+bool core_hook();
+bool try_hook();
 void idle_loop();
+void read_config();
 
 #ifdef ENV32
 #define MOD (L"ts3client_win32.exe")

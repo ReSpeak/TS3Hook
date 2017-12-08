@@ -34,7 +34,7 @@ const char* ts3plugin_description() { return "Prints command packets on the cons
 void ts3plugin_setFunctionPointers(void* funcs) { }
 
 int ts3plugin_init() {
-	return CoreHook() ? 0 : 1;
+	return core_hook() ? 0 : 1;
 }
 void ts3plugin_shutdown() {
 	printf("%s: Shutting down\n", ts3plugin_name());

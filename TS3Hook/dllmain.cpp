@@ -2,8 +2,10 @@
 #include "main.h"
 #include <cstdio>
 #include "PatchTools.h"
-#include <iostream>
 #include <string>
+#include <vector>
+#include <sstream>
+#include <iterator>
 
 #ifdef ENV32
 #define STD_DECL __cdecl
@@ -29,7 +31,7 @@ hookpt OUT_HOOKS[] = {
 };
 #endif
 
-HANDLE hConsole = NULL;
+HANDLE hConsole = nullptr;
 
 std::vector<std::string> inFilter = {
 	//examples
@@ -48,30 +50,73 @@ extern "C"
 	SIZE_T packet_out_hook_return = 0x0;
 }
 
-bool CoreHook()
+LPCWSTR lpFileName = L".\\HookConf.ini";
+LPCWSTR lpSection = L"Config";
+WCHAR outprefix[256];
+WCHAR inprefix[256];
+std::vector<std::string> ignorecmds;
+
+#define CONFSETT(var, form) if(GetLastError()) { printf("For "#var" using default: %"#form"\n", var); } else { printf("For "#var" using: %"#form"\n", var); }
+
+template<typename Out>
+void split(const std::string &s, const char delim, Out result) {
+	std::stringstream ss(s);
+	std::string item;
+	while (std::getline(ss, item, delim)) {
+		*(result++) = item;
+	}
+}
+
+std::vector<std::string> split(const std::string &s, const char delim) {
+	std::vector<std::string> elems;
+	split(s, delim, std::back_inserter(elems));
+	return elems;
+}
+
+void read_config()
+{
+	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
+	CONFSETT(outprefix, ls);
+	GetPrivateProfileString(lpSection, L"inprefix", L"[IN ]", inprefix, sizeof(inprefix), lpFileName);
+	CONFSETT(inprefix, ls);
+	WCHAR ignorecmds_wc[4096];
+	GetPrivateProfileString(lpSection, L"ignorecmds", L"", ignorecmds_wc, sizeof(ignorecmds_wc), lpFileName);
+	CHAR ignorecmds_c[sizeof(ignorecmds_wc)];
+	wcstombs(ignorecmds_c, ignorecmds_wc, sizeof(ignorecmds_wc));
+	const std::string ignorestr(ignorecmds_c);
+	ignorecmds = split(ignorestr, ',');
+	for(auto igcmd : ignorecmds)
+	{
+		printf("Ignoring %s\n", igcmd.c_str());
+	}
+}
+
+bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	if (hConsole != NULL)
+	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("-==== TS3HOOK 1.0 ====-\n");
 	printf("-= Written by Splamy =-\n");
 
-	if (!TryHook())
+	read_config();
+
+	if (!try_hook())
 	{
-		if (hConsole != NULL)
+		if (hConsole != nullptr)
 			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
 		printf("Packet dispatcher not found, aborting\n");
 		return false;
 	}
 	else
 	{
-		if (hConsole != NULL)
+		if (hConsole != nullptr)
 			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 		printf("Hook successful!\n");
 	}
 
-	if (hConsole != NULL)
+	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, 0);
 
 	return true;
@@ -80,11 +125,11 @@ bool CoreHook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	std::string buffer = std::string(packet);
-	for each(std::string filter in inFilter) {
-		if (buffer.find(filter) != std::string::npos)
+	for each(std::string filter in ignorecmds) {
+		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != NULL)
+	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("[ IN] %.*s\n", length, packet);
 }
@@ -92,17 +137,17 @@ void STD_DECL log_in_packet(char* packet, int length)
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	std::string buffer = std::string(packet);
-	for each(std::string filter in outFilter) {
-		if (buffer.find(filter) != std::string::npos)
+	for each(std::string filter in ignorecmds) {
+		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != NULL)
+	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("[OUT] %.*s\n", length, packet);
+	printf("%ls %.*s\n", outprefix, length, packet);
 }
 
 #ifdef ENV32
-bool TryHook()
+bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
@@ -176,7 +221,7 @@ void __declspec(naked) packet_out_hook1()
 	}
 }
 #else
-bool TryHook()
+bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
