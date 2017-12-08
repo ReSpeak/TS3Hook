@@ -31,6 +31,16 @@ hookpt OUT_HOOKS[] = {
 
 HANDLE hConsole = NULL;
 
+std::vector<std::string> inFilter = {
+	//examples
+	//std::string("notifyclientupdated"),
+	//std::string("notifyclientleftview")
+};
+std::vector<std::string> outFilter = {
+	//examples
+	//std::string("channelsubscribe"),
+};
+
 // RUNTIME CALCED
 extern "C"
 {
@@ -69,6 +79,11 @@ bool CoreHook()
 
 void STD_DECL log_in_packet(char* packet, int length)
 {
+	std::string buffer = std::string(packet);
+	for each(std::string filter in inFilter) {
+		if (buffer.find(filter) != std::string::npos)
+			return;
+	}
 	if (hConsole != NULL)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("[ IN] %.*s\n", length, packet);
@@ -76,6 +91,11 @@ void STD_DECL log_in_packet(char* packet, int length)
 
 void STD_DECL log_out_packet(char* packet, int length)
 {
+	std::string buffer = std::string(packet);
+	for each(std::string filter in outFilter) {
+		if (buffer.find(filter) != std::string::npos)
+			return;
+	}
 	if (hConsole != NULL)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("[OUT] %.*s\n", length, packet);
