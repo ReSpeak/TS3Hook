@@ -131,7 +131,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 	}
 	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("[ IN] %.*s\n", length, packet);
+	printf("%ls %.*s\n", inprefix, length, packet);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
