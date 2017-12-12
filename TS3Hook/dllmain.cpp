@@ -6,6 +6,7 @@
 #include <vector>
 #include <sstream>
 #include <iterator>
+#include <fstream>
 
 #ifdef ENV32
 #define STD_DECL __cdecl
@@ -75,8 +76,27 @@ std::vector<std::string> split(const std::string &s, const char delim) {
 	return elems;
 }
 
+bool file_exists(LPCWSTR fileName)
+{
+	std::ifstream file(fileName);
+	return file.good();
+}
+
+void create_config(LPCWSTR fileName)
+{
+	WritePrivateProfileString(lpSection, L"outprefix", L"[OUT]", lpFileName);
+	WritePrivateProfileString(lpSection, L"outsuffix", L"", lpFileName);
+	WritePrivateProfileString(lpSection, L"inprefix", L"[IN ]", lpFileName);
+	WritePrivateProfileString(lpSection, L"insuffix", L"", lpFileName);
+	WritePrivateProfileString(lpSection, L"ignorecmds", L"", lpFileName);
+	printf("Created config %ls\n", lpFileName);
+}
+
 void read_config()
 {
+	if (!file_exists(lpFileName))
+		create_config(lpFileName);
+
 	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
 	CONFSETT(outprefix, ls);
 	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
