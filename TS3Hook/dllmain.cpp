@@ -53,7 +53,9 @@ extern "C"
 LPCWSTR lpFileName = L".\\HookConf.ini";
 LPCWSTR lpSection = L"Config";
 WCHAR outprefix[256];
+WCHAR outsuffix[256];
 WCHAR inprefix[256];
+WCHAR insuffix[256];
 std::vector<std::string> ignorecmds;
 
 #define CONFSETT(var, form) if(GetLastError()) { printf("For "#var" using default: %"#form"\n", var); } else { printf("For "#var" using: %"#form"\n", var); }
@@ -77,8 +79,12 @@ void read_config()
 {
 	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
 	CONFSETT(outprefix, ls);
+	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
+	CONFSETT(outsuffix, ls);
 	GetPrivateProfileString(lpSection, L"inprefix", L"[IN ]", inprefix, sizeof(inprefix), lpFileName);
 	CONFSETT(inprefix, ls);
+	GetPrivateProfileString(lpSection, L"insuffix", L"", insuffix, sizeof(insuffix), lpFileName);
+	CONFSETT(insuffix, ls);
 	WCHAR ignorecmds_wc[4096];
 	GetPrivateProfileString(lpSection, L"ignorecmds", L"", ignorecmds_wc, sizeof(ignorecmds_wc), lpFileName);
 	CHAR ignorecmds_c[sizeof(ignorecmds_wc)];
@@ -131,7 +137,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 	}
 	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%ls %.*s\n", inprefix, length, packet);
+	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
@@ -143,7 +149,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%ls %.*s\n", outprefix, length, packet);
+	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 
 #ifdef ENV32
