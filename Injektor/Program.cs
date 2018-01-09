@@ -6,12 +6,12 @@ using System.Text;
 
 namespace Injector
 {
-	class Program
+	static class Program
 	{
 #if WIN32
-		const string procName = "ts3client_win32";
+		const string ProcName = "ts3client_win32";
 #else
-		const string procName = "ts3client_win64";
+		const string ProcName = "ts3client_win64";
 #endif
 
 		static void Main(string[] args)
@@ -25,7 +25,7 @@ namespace Injector
 			Process[] procs;
 			do
 			{
-				procs = Process.GetProcessesByName(procName);
+				procs = Process.GetProcessesByName(ProcName);
 				if (procs.Length == 0)
 				{
 					Console.WriteLine("No Process found");
@@ -97,11 +97,11 @@ namespace Injector
 			if (hndProc == IntPtr.Zero)
 			{
 				int errglc = GetLastError();
-				return $"hndProc is null ({errglc.ToString("X")})";
+				return $"hndProc is null ({errglc:X})";
 			}
 
-			IntPtr lpLLAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
-			if (lpLLAddress == IntPtr.Zero)
+			IntPtr lpLlAddress = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
+			if (lpLlAddress == IntPtr.Zero)
 			{
 				return "lpLLAddress is null";
 			}
@@ -116,14 +116,14 @@ namespace Injector
 			if (!WriteProcessMemory(hndProc, lpAddress, bytes, (uint)bytes.Length, 0))
 			{
 				int errglc = GetLastError();
-				return $"WriteProcessMemory failed error: {errglc.ToString("X")}";
+				return $"WriteProcessMemory failed error: {errglc:X}";
 			}
 
-			var ptr = CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, lpLLAddress, lpAddress, 0, IntPtr.Zero);
+			var ptr = CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, lpLlAddress, lpAddress, 0, IntPtr.Zero);
 			if (ptr == IntPtr.Zero)
 			{
 				int errglc = GetLastError();
-				return $"CreateRemoteThread returned error ({errglc.ToString("X")})";
+				return $"CreateRemoteThread returned error ({errglc:X})";
 			}
 
 			for (int i = 0; i < 10; i++)
@@ -134,8 +134,8 @@ namespace Injector
 					if (item.ModuleName == "TS3Hook.dll")
 					{
 						var hookptr = LoadLibrary(sDllPath);
-						IntPtr plug_entry = GetProcAddress(hookptr, "ts3plugin_init");
-						long diff = plug_entry.ToInt64() - hookptr.ToInt64();
+						IntPtr plugEntry = GetProcAddress(hookptr, "ts3plugin_init");
+						long diff = plugEntry.ToInt64() - hookptr.ToInt64();
 						IntPtr finptr = (IntPtr)(item.BaseAddress.ToInt64() + diff);
 
 						if (CreateRemoteThread(hndProc, IntPtr.Zero, IntPtr.Zero, finptr, IntPtr.Zero, 0, IntPtr.Zero) == IntPtr.Zero)

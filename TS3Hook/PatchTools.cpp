@@ -1,11 +1,11 @@
 #include "main.h"
-#include <windows.h>
+#include <Windows.h>
 #include <Psapi.h>
 
 MODULEINFO GetModuleInfo(const LPCWSTR szModule)
 {
-	MODULEINFO modinfo = { 0 };
-	HMODULE hModule = GetModuleHandle(szModule);
+	MODULEINFO modinfo = { nullptr, 0, nullptr };
+	const HMODULE hModule = GetModuleHandle(szModule);
 	if (hModule == nullptr)
 		return modinfo;
 	GetModuleInformation(GetCurrentProcess(), hModule, &modinfo, sizeof(MODULEINFO));
@@ -20,8 +20,8 @@ SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
 	//Assign our base and module size
 	//Having the values right is ESSENTIAL, this makes sure
 	//that we don't scan unwanted memory and leading our game to crash
-	const SIZE_T base = (SIZE_T)mInfo.lpBaseOfDll;
-	const SIZE_T size = (SIZE_T)mInfo.SizeOfImage;
+	const SIZE_T base = reinterpret_cast<SIZE_T>(mInfo.lpBaseOfDll);
+	const SIZE_T size = static_cast<SIZE_T>(mInfo.SizeOfImage);
 
 	//Get length for our mask, this will allow us to loop through our array
 	const SIZE_T patternLength = strlen(mask);
@@ -33,7 +33,7 @@ SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
 		{
 			//if we have a ? in our mask then we have true by default, 
 			//or if the bytes match then we keep searching until finding it or not
-			found &= mask[j] == '?' || pattern[j] == *(char*)(base + i + j);
+			found &= mask[j] == '?' || pattern[j] == *reinterpret_cast<char*>(base + i + j);
 		}
 
 		//found = true, our entire pattern was found
@@ -50,7 +50,7 @@ SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
 #ifdef ENV32
 void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 {
-	DWORD dwOldProtect, dwBkup, dwRelAddr;
+	DWORD dwOldProtect, dwBkup;
 
 	// give the paged memory read/write permissions
 
@@ -60,7 +60,7 @@ void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 	// and subtract the 5bytes, which is the size of the jmp
 	// (0xE9 0xAA 0xBB 0xCC 0xDD) = 5 bytes
 
-	dwRelAddr = (SIZE_T)((SIZE_T)dwJumpTo - (SIZE_T)pAddress) - 5;
+	const DWORD dwRelAddr = static_cast<SIZE_T>(reinterpret_cast<SIZE_T>(dwJumpTo) - reinterpret_cast<SIZE_T>(pAddress)) - 5;
 
 	// overwrite the byte at pAddress with the jmp opcode (0xE9)
 
@@ -69,7 +69,7 @@ void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 	// overwrite the next 4 bytes (which is the size of a DWORD)
 	// with the dwRelAddr
 
-	*((SIZE_T *)(pAddress + 0x1)) = dwRelAddr;
+	*reinterpret_cast<SIZE_T *>(pAddress + 0x1) = dwRelAddr;
 
 	// overwrite the remaining bytes with the NOP opcode (0x90)
 	// NOP opcode = No OPeration
@@ -102,7 +102,7 @@ void MakeJMP(PBYTE const pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 	memcpy(pAddress, stub, sizeof(stub));
 
 	for (int i = MinLen; i < dwLen; i++)
-		*(BYTE*)((DWORD_PTR)pAddress + i) = 0x90;
+		*reinterpret_cast<BYTE*>(reinterpret_cast<DWORD_PTR>(pAddress) + i) = 0x90;
 
 	VirtualProtect(pAddress, dwLen, dwOld, &dwOld);
 }

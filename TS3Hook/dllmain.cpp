@@ -111,7 +111,7 @@ void read_config()
 	wcstombs(ignorecmds_c, ignorecmds_wc, sizeof(ignorecmds_wc));
 	const std::string ignorestr(ignorecmds_c);
 	ignorecmds = split(ignorestr, ',');
-	for(auto igcmd : ignorecmds)
+	for(const auto &igcmd : ignorecmds)
 	{
 		printf("Ignoring %s\n", igcmd.c_str());
 	}
@@ -177,21 +177,21 @@ bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
-		printf("> Found PKGIN1: %zX\n", match_in_1);
+		printf("> Found PKGIN1: %lX\n", match_in_1);
 
 	const auto match_out_1 = FindPattern(MOD, PATT_OUT_1, MASK_OUT_1);
 	if (match_out_1 != NULL)
-		printf("> Found PKGOUT1: %zX\n", match_out_1);
+		printf("> Found PKGOUT1: %lX\n", match_out_1);
 
 	if (match_in_1 != NULL && match_out_1 != NULL)
 	{
 		const SIZE_T OFFS_IN_1 = 13;
 		packet_in_hook_return = match_in_1 + OFFS_IN_1 + 5;
-		MakeJMP((PBYTE)(match_in_1 + OFFS_IN_1), packet_in_hook1, 5);
+		MakeJMP(reinterpret_cast<PBYTE>(match_in_1 + OFFS_IN_1), reinterpret_cast<PVOID>(packet_in_hook1), 5);
 
 		const SIZE_T OFFS_OUT_1 = 33;
 		packet_out_hook_return = match_out_1 + OFFS_OUT_1 + 8;
-		MakeJMP((PBYTE)(match_out_1 + OFFS_OUT_1), packet_out_hook1, 8);
+		MakeJMP(reinterpret_cast<PBYTE>(match_out_1 + OFFS_OUT_1), reinterpret_cast<PVOID>(packet_out_hook1), 8);
 		return true;
 	}
 
@@ -268,10 +268,10 @@ bool try_hook()
 	if (match_in_1 != NULL && match_out != NULL)
 	{
 		packet_in_hook_return = match_in_1 + 22;
-		MakeJMP((PBYTE)(match_in_1), packet_in_hook1, 22);
+		MakeJMP(reinterpret_cast<PBYTE>(match_in_1), packet_in_hook1, 22);
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
-		MakeJMP((PBYTE)(match_out), pt_out->target_hook, pt_out->hook_length);
+		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
 		return true;
 	}
 
