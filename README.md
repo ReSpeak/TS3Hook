@@ -14,9 +14,13 @@ This is a TS3Client Plugin that decrypts Teamspeak 3 command packets on the fly 
 
 NOTE: You can also inject the DLL with the injector of the latest release.
 
-## Todo
+## Injection
 
-- Make it possible to inject (send) own commands.
+Send a chat message with `~cmd` and append a command where ` ` (spaces) are replaced with `~s`.  
+Example:  
+`~cmdsendtextmessage~stargetmode=2~smsg=hi`  
+to send  
+`sendtextmessage targetmode=2 msg=hi`
 
 <details><summary>Screenshots</summary>
 

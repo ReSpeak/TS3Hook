@@ -135,7 +135,7 @@ bool core_hook()
 
 	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("-==== TS3HOOK 1.0 ====-\n");
+	printf("-==== TS3HOOK 1.1 ====-\n");
 	printf("-= Written by Splamy =-\n");
 
 	read_config();
