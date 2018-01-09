@@ -58,6 +58,8 @@ WCHAR outsuffix[256];
 WCHAR inprefix[256];
 WCHAR insuffix[256];
 std::vector<std::string> ignorecmds;
+std::vector<std::string> blockcmds;
+const std::string injectcmd(" msg=~cmd");
 
 #define CONFSETT(var, form) if(GetLastError()) { printf("For "#var" using default: %"#form"\n", var); } else { printf("For "#var" using: %"#form"\n", var); }
 
@@ -76,20 +78,31 @@ std::vector<std::string> split(const std::string &s, const char delim) {
 	return elems;
 }
 
-bool file_exists(LPCWSTR fileName)
+bool file_exists(const LPCWSTR file_name)
 {
-	std::ifstream file(fileName);
+	std::ifstream file(file_name);
 	return file.good();
 }
 
-void create_config(LPCWSTR fileName)
+void create_config(const LPCWSTR file_name)
 {
-	WritePrivateProfileString(lpSection, L"outprefix", L"[OUT]", lpFileName);
-	WritePrivateProfileString(lpSection, L"outsuffix", L"", lpFileName);
-	WritePrivateProfileString(lpSection, L"inprefix", L"[IN ]", lpFileName);
-	WritePrivateProfileString(lpSection, L"insuffix", L"", lpFileName);
-	WritePrivateProfileString(lpSection, L"ignorecmds", L"", lpFileName);
-	printf("Created config %ls\n", lpFileName);
+	WritePrivateProfileString(lpSection, L"outprefix", L"[OUT]", file_name);
+	WritePrivateProfileString(lpSection, L"outsuffix", L"", file_name);
+	WritePrivateProfileString(lpSection, L"inprefix", L"[IN ]", file_name);
+	WritePrivateProfileString(lpSection, L"insuffix", L"", file_name);
+	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
+	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
+	printf("Created config %ls\n", file_name);
+}
+
+template<size_t Size>
+void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
+{
+	char outbuffer[Size];
+	size_t converted;
+	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
+	const std::string ignorestr(outbuffer, converted - 1);
+	out = split(ignorestr, ',');
 }
 
 void read_config()
@@ -105,16 +118,15 @@ void read_config()
 	CONFSETT(inprefix, ls);
 	GetPrivateProfileString(lpSection, L"insuffix", L"", insuffix, sizeof(insuffix), lpFileName);
 	CONFSETT(insuffix, ls);
-	WCHAR ignorecmds_wc[4096];
-	GetPrivateProfileString(lpSection, L"ignorecmds", L"", ignorecmds_wc, sizeof(ignorecmds_wc), lpFileName);
-	CHAR ignorecmds_c[sizeof(ignorecmds_wc)];
-	wcstombs(ignorecmds_c, ignorecmds_wc, sizeof(ignorecmds_wc));
-	const std::string ignorestr(ignorecmds_c);
-	ignorecmds = split(ignorestr, ',');
-	for(const auto &igcmd : ignorecmds)
-	{
+	wchar_t splitbuffer[4096];
+	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	read_split_list(splitbuffer, ignorecmds);
+	for (const auto &igcmd : ignorecmds)
 		printf("Ignoring %s\n", igcmd.c_str());
-	}
+	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	read_split_list(splitbuffer, blockcmds);
+	for (const auto &igcmd : blockcmds)
+		printf("Blocking %s\n", igcmd.c_str());
 }
 
 bool core_hook()
@@ -150,25 +162,55 @@ bool core_hook()
 
 void STD_DECL log_in_packet(char* packet, int length)
 {
-	std::string buffer = std::string(packet);
+	const auto buffer = std::string(packet, length);
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
+}
+
+void replace_all(std::string& str, const std::string& from, const std::string& to) {
+	if (from.empty())
+		return;
+	size_t start_pos = 0;
+	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+		str.replace(start_pos, from.length(), to);
+		start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+	}
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
 {
-	std::string buffer = std::string(packet);
+	const auto buffer = std::string(packet, length);
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	for each(std::string filter in blockcmds) {
+		if (!buffer.compare(0, filter.size(), filter)) {
+			memset(packet, ' ', length);
+			if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+			printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
+			return;
+		}
+	}
+	auto find_pos = buffer.find(injectcmd);
+	if (find_pos != std::string::npos)
+	{
+		int in_off = find_pos + injectcmd.size();
+		auto in_str = std::string(packet + in_off, length - in_off);
+
+		replace_all(in_str, std::string("~s"), std::string(" "));
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		printf("%ls Injecting (%s) %ls\n", outprefix, in_str.c_str(), outsuffix);
+
+		memcpy(packet, in_str.c_str(), in_str.length());
+		memset(packet + in_str.length(), ' ', length - in_str.length());
+	}
+
+	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 
