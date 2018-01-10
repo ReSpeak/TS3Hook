@@ -203,14 +203,17 @@ void STD_DECL log_out_packet(char* packet, int length)
 		auto in_str = std::string(packet + in_off, length - in_off);
 
 		replace_all(in_str, std::string("~s"), std::string(" "));
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-		printf("%ls Injecting (%s) %ls\n", outprefix, in_str.c_str(), outsuffix);
 
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
+
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	}
+	else
+	{
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
 
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 
