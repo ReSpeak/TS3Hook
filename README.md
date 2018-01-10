@@ -8,7 +8,7 @@ This is a TS3Client Plugin that decrypts Teamspeak 3 command packets on the fly 
 
 - Shows incoming/outgoing command packets of your client.
 - Ability to hide certain commands to keep focusing on the important stuff.
-- Ability to block certain outgoing commands to hide your connectioninfo for example.
+- Ability to block certain outgoing commands to [hide your connectioninfo](https://github.com/ReSpeak/TS3Hook/issues/14) for example.
 - Ability to send own commands through your client.
 
 ## How to use
