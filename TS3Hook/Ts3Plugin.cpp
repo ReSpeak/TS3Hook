@@ -34,8 +34,7 @@ const char* ts3plugin_description() { return "Prints command packets on the cons
 void ts3plugin_setFunctionPointers(void* funcs) { }
 
 int ts3plugin_init() {
-	printf("-= %s v%s =-\n", ts3plugin_name(), ts3plugin_version());
-	printf("-= Written by %s =-\n", ts3plugin_author());
+	printf("-= %s v%s by %s =-\n", ts3plugin_name(), ts3plugin_version(), ts3plugin_author());
 	return core_hook() ? 0 : 1;
 }
 void ts3plugin_shutdown() {

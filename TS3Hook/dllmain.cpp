@@ -53,6 +53,7 @@ extern "C"
 
 LPCWSTR lpFileName = L".\\HookConf.ini";
 LPCWSTR lpSection = L"Config";
+const char* prefix = "TS3Hook: ";
 WCHAR outprefix[256];
 WCHAR outsuffix[256];
 WCHAR inprefix[256];
@@ -61,7 +62,11 @@ std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 const std::string injectcmd(" msg=~cmd");
 
-#define CONFSETT(var, form) if(GetLastError()) { printf("For "#var" using default: %"#form"\n", var); } else { printf("For "#var" using: %"#form"\n", var); }
+#define CONFSETT(var, form) if(GetLastError()) {\
+		printf("%sFor "#var" using default: %"#form"\n", prefix, var);\
+	} else {\
+		printf("%sFor "#var" using: %"#form"\n", prefix, var);\
+	}
 
 template<typename Out>
 void split(const std::string &s, const char delim, Out result) {
@@ -92,7 +97,8 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"insuffix", L"", file_name);
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
-	printf("Created config %ls\n", file_name);
+	WritePrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", file_name);
+	printf("%sCreated config %ls\n", prefix, file_name);
 }
 
 template<size_t Size>
@@ -111,31 +117,39 @@ void read_config()
 		create_config(lpFileName);
 
 	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
-	CONFSETT(outprefix, ls);
+	//CONFSETT(outprefix, ls);
 	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
-	CONFSETT(outsuffix, ls);
+	//CONFSETT(outsuffix, ls);
 	GetPrivateProfileString(lpSection, L"inprefix", L"[IN ]", inprefix, sizeof(inprefix), lpFileName);
-	CONFSETT(inprefix, ls);
+	//CONFSETT(inprefix, ls);
 	GetPrivateProfileString(lpSection, L"insuffix", L"", insuffix, sizeof(insuffix), lpFileName);
-	CONFSETT(insuffix, ls);
+	//CONFSETT(insuffix, ls);
 	wchar_t splitbuffer[4096];
 	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, ignorecmds);
+	printf("%sIgnoring ", prefix);
 	for (const auto &igcmd : ignorecmds)
-		printf("Ignoring %s\n", igcmd.c_str());
+		printf("%s,", igcmd.c_str());
+	printf("\n");
 	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	printf("%sBlocking ", prefix);
 	read_split_list(splitbuffer, blockcmds);
-	for (const auto &igcmd : blockcmds)
-		printf("Blocking %s\n", igcmd.c_str());
+	for (const auto &igcmd : blockcmds) {
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		printf("%s,", igcmd.c_str());
+	}
+	printf("\n");
+	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
+	//CONFSETT(injectcmd, ls);
 }
 
 bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	/*if (hConsole != nullptr)
+	if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	*/
 
 	read_config();
 
@@ -143,14 +157,8 @@ bool core_hook()
 	{
 		if (hConsole != nullptr)
 			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-		printf("Packet dispatcher not found, aborting\n");
+		printf("%sPacket dispatcher not found, aborting\n", prefix);
 		return false;
-	}
-	else
-	{
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("Hook successful!\n");
 	}
 
 	if (hConsole != nullptr)
@@ -221,12 +229,8 @@ void STD_DECL log_out_packet(char* packet, int length)
 bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-	if (match_in_1 != NULL)
-		printf("> Found PKGIN1: %lX\n", match_in_1);
 
 	const auto match_out_1 = FindPattern(MOD, PATT_OUT_1, MASK_OUT_1);
-	if (match_out_1 != NULL)
-		printf("> Found PKGOUT1: %lX\n", match_out_1);
 
 	if (match_in_1 != NULL && match_out_1 != NULL)
 	{
@@ -237,6 +241,9 @@ bool try_hook()
 		const SIZE_T OFFS_OUT_1 = 33;
 		packet_out_hook_return = match_out_1 + OFFS_OUT_1 + 8;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out_1 + OFFS_OUT_1), reinterpret_cast<PVOID>(packet_out_hook1), 8);
+		if (hConsole != nullptr)
+			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		printf("%sHook successfull! (x86 PKGIN: %lX PKGOUT: %lX\n", prefix, match_in_1, match_out_1);
 		return true;
 	}
 
@@ -296,7 +303,8 @@ bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
-		printf("> Found PKGIN: %zX\n", match_in_1);
+		if (hConsole != nullptr)
+			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
@@ -304,8 +312,9 @@ bool try_hook()
 	{
 		match_out = FindPattern(MOD, pt.PATT, pt.MASK);
 		if (match_out != NULL) {
+			if (hConsole != nullptr)
+				SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 			pt_out = &pt;
-			printf("> Found PKGOUT: %zX\n", match_out);
 			break;
 		}
 	}
@@ -317,6 +326,9 @@ bool try_hook()
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
+		if (hConsole != nullptr)
+			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		printf("%sHook successfull! (x64 PKGIN: %lX PKGOUT: %lX)\n", prefix, match_in_1, match_out);
 		return true;
 	}
 
