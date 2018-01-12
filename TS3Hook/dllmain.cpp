@@ -184,22 +184,10 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
-	for each(std::string filter in ignorecmds) {
-		if (!buffer.compare(0, filter.size(), filter))
-			return;
-	}
-	for each(std::string filter in blockcmds) {
-		if (!buffer.compare(0, filter.size(), filter)) {
-			memset(packet, ' ', length);
-			if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-			printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
-			return;
-		}
-	}
-	auto find_pos = buffer.find(injectcmd);
+	const auto find_pos = buffer.find(injectcmd);
 	if (find_pos != std::string::npos)
 	{
-		int in_off = find_pos + injectcmd.size();
+		const int in_off = find_pos + injectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 
 		replace_all(in_str, std::string("~s"), std::string(" "));
@@ -211,6 +199,19 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	else
 	{
+		for each(std::string filter in ignorecmds) {
+			if (!buffer.compare(0, filter.size(), filter))
+				return;
+		}
+		for each(std::string filter in blockcmds) {
+			if (!buffer.compare(0, filter.size(), filter)) {
+				memset(packet, ' ', length);
+				if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+				printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
+				return;
+			}
+		}
+
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
 
