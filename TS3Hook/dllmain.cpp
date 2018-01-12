@@ -133,10 +133,9 @@ bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	if (hConsole != nullptr)
+	/*if (hConsole != nullptr)
 		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("-==== TS3HOOK 1.1 ====-\n");
-	printf("-= Written by Splamy =-\n");
+	*/
 
 	read_config();
 
