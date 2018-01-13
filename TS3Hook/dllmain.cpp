@@ -104,7 +104,6 @@ bool file_exists(const LPCWSTR file_name)
 }
 void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
 	ts3Functions = funcs;
-	printf("got FUNCTIONS!!! \n\n\n\n\n\n\n\n");
 }
 
 void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber) {
