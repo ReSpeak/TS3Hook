@@ -60,6 +60,7 @@ WCHAR inprefix[256];
 WCHAR insuffix[256];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
+std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
 const std::string clientinit("clientinit ");
 
@@ -90,7 +91,6 @@ bool file_exists(const LPCWSTR file_name)
 	return file.good();
 }
 
-
 void create_config(const LPCWSTR file_name)
 {
 	WritePrivateProfileString(lpSection, L"outprefix", L"[OUT]", file_name);
@@ -100,7 +100,18 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", file_name);
+	WritePrivateProfileString(lpSection, L"clientversion", L"", file_name);
 	printf("%sCreated config %ls\n", prefix, file_name);
+}
+
+void replace_all(std::string& str, const std::string& from, const std::string& to) {
+	if (from.empty())
+		return;
+	size_t start_pos = 0;
+	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+		str.replace(start_pos, from.length(), to);
+		start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+	}
 }
 
 template<size_t Size>
@@ -111,6 +122,16 @@ void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
 	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
 	const std::string ignorestr(outbuffer, converted - 1);
 	out = split(ignorestr, ',');
+}
+
+template<size_t Size>
+void read_split_list_vertical(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
+{
+	char outbuffer[Size];
+	size_t converted;
+	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
+	const std::string ignorestr(outbuffer, converted - 1);
+	out = split(ignorestr, '|');
 }
 
 void read_config()
@@ -141,6 +162,10 @@ void read_config()
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 		printf("%s,", igcmd.c_str());
 	}
+	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	read_split_list_vertical(splitbuffer, clientver);
+	replace_all(clientver[0], " ", R"(\s)");
+	replace_all(clientver[2], "/", R"(\/)");
 	printf("\n");
 	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
 	//CONFSETT(injectcmd, ls);
@@ -180,17 +205,6 @@ void STD_DECL log_in_packet(char* packet, int length)
 	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
 }
 
-void replace_all(std::string& str, const std::string& from, const std::string& to) {
-	if (from.empty())
-		return;
-	size_t start_pos = 0;
-	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-		str.replace(start_pos, from.length(), to);
-		start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
-	}
-}
-
-
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
@@ -211,29 +225,29 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	else if (find_pos_cinit != std::string::npos) 
 	{
-		const int client_ver = buffer.find("client_version="); //15
-		const int client_platform = buffer.find("client_platform="); //16
-		const int client_version_sign = buffer.find("client_version_sign="); //20
-		const int client_key_offset = buffer.find("client_key_offset="); //18
-		const int client_input_hardware = buffer.find("client_input_hardware="); //22
-		const int client_nickname = buffer.find("client_nickname="); //16
-
+		const int client_ver = buffer.find("client_version=");
+		const int client_platform = buffer.find("client_platform=");
+		const int client_version_sign = buffer.find("client_version_sign=");
+		const int client_key_offset = buffer.find("client_key_offset=");
+		const int client_input_hardware = buffer.find("client_input_hardware=");
+		const int client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
-		const std::string raw = R"(jvhhk75EV3nCGeewx4Y5zZmiZSN07q5ByKZ9Wlmg85aAbnw7c1jKq5\/Iq0zY6dfGwCEwuKod0I5lQcVLf2NTCg==)";
-
-		//CLIENT_VERSION_SIGN
-		in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
-		in_str.insert(client_version_sign + 20, /*R"(tdNngCAZ1ImAf7BxJzO4RXv5nBRsUERsrSOnMKVUFNQg6BS4Bzag0RFgLVzs2DRj19AC8+q5cXgH+5Ms50mTCA==)"*/ raw);
-		//CLIENT_PLATFORM
-		in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
-	    in_str.insert(client_platform + 16, "Linux");
-		//CLIENT_VERSION
-		in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
-		in_str.insert(client_ver + 15, R"(3.0.19.4\s[Build:\s1468491418])");
-		//CLIENT_NICKNAME
+		if (clientver[2] != "") {
+			in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
+			in_str.insert(client_version_sign + 20, clientver[2]);
+		}
+		if (clientver[1] != "") {
+			in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+			in_str.insert(client_platform + 16, clientver[1]);
+		}
+		if (clientver[0] != "") {
+			in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
+			in_str.insert(client_ver + 15, clientver[0]);
+		}
 		int nickname_length = (client_ver - client_nickname - 17);
 		
-		int length_difference = length - in_str.length();
+		int length_difference = buffer.size() - in_str.size();
+		printf("LENGTH DIFFERENCE: %i\n", length_difference);
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
@@ -243,6 +257,9 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_nickname + 16, "HAX");
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
+		}
+		else {
+			printf("[INFO] Couldn't set fake platform\n");
 		}
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
