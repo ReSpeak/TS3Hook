@@ -146,6 +146,7 @@
   <ItemGroup>
     <ClInclude Include="main.h" />
     <ClInclude Include="PatchTools.h" />
+    <ClInclude Include="ts3_functions.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

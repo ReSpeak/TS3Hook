@@ -1,5 +1,6 @@
 ﻿// dllmain.cpp : Defines the entry point for the DLL application.
 #include "main.h"
+#include "include\ts3_functions.h"
 #include <cstdio>
 #include "PatchTools.h"
 #include <string>
@@ -8,6 +9,13 @@
 #include <iterator>
 #include <fstream>
 
+#define PLUGINS_EXPORTDLL __declspec(dllexport)
+
+// Plugin exports
+extern "C" {
+	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(const struct TS3Functions funcs);
+	PLUGINS_EXPORTDLL void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber);
+}
 #ifdef ENV32
 #define STD_DECL __cdecl
 
@@ -33,7 +41,6 @@ hookpt OUT_HOOKS[] = {
 #endif
 
 HANDLE hConsole = nullptr;
-
 std::vector<std::string> inFilter = {
 	//examples
 	//std::string("notifyclientupdated"),
@@ -50,7 +57,8 @@ extern "C"
 	SIZE_T packet_in_hook_return = 0x0;
 	SIZE_T packet_out_hook_return = 0x0;
 }
-
+std::string nickname;
+bool nick_change_needed = false;
 LPCWSTR lpFileName = L".\\HookConf.ini";
 LPCWSTR lpSection = L"Config";
 const char* prefix = "TS3Hook: ";
@@ -63,6 +71,10 @@ std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
 const std::string clientinit("clientinit ");
+static struct TS3Functions ts3Functions;
+anyID myID;
+uint64 cid;
+
 
 #define CONFSETT(var, form) if(GetLastError()) {\
 		printf("%sFor "#var" using default: %"#form"\n", prefix, var);\
@@ -89,6 +101,20 @@ bool file_exists(const LPCWSTR file_name)
 {
 	std::ifstream file(file_name);
 	return file.good();
+}
+void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
+	ts3Functions = funcs;
+	printf("got FUNCTIONS!!! \n\n\n\n\n\n\n\n");
+}
+
+void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber) {
+	if (newStatus == STATUS_CONNECTION_ESTABLISHED && nick_change_needed) {
+		nick_change_needed = false;
+		ts3Functions.getClientID(serverConnectionHandlerID, &myID);
+		ts3Functions.getChannelOfClient(serverConnectionHandlerID, myID, &cid);
+		std::string nick = "~cmdclientupdate~sclient_nickname=" + nickname;
+		ts3Functions.requestSendChannelTextMsg(serverConnectionHandlerID, nick.c_str(), cid, NULL);
+	}
 }
 
 void create_config(const LPCWSTR file_name)
@@ -254,6 +280,8 @@ void STD_DECL log_out_packet(char* packet, int length)
 			memset(packet + in_str.length(), ' ', length - in_str.length());
 		}
 		else if (nickname_length > 3 && length_difference + nickname_length >= 0) {
+			nickname = in_str.substr(client_nickname + 16, (client_ver - client_nickname - 17));
+			nick_change_needed = true;
 			in_str.erase(client_nickname + 16, (client_ver - client_nickname - 17));
 			in_str.insert(client_nickname + 16, "HAX");
 			memcpy(packet, in_str.c_str(), in_str.length());
@@ -282,7 +310,6 @@ void STD_DECL log_out_packet(char* packet, int length)
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
-
 	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 

@@ -68,7 +68,6 @@ extern "C" {
 	PLUGINS_EXPORTDLL int ts3plugin_apiVersion();
 	PLUGINS_EXPORTDLL const char* ts3plugin_author();
 	PLUGINS_EXPORTDLL const char* ts3plugin_description();
-	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(void* funcs);
 	PLUGINS_EXPORTDLL int ts3plugin_init();
 	PLUGINS_EXPORTDLL void ts3plugin_shutdown();
 }
