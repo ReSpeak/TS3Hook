@@ -61,6 +61,7 @@ WCHAR insuffix[256];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 const std::string injectcmd(" msg=~cmd");
+const std::string clientinit("clientinit ");
 
 #define CONFSETT(var, form) if(GetLastError()) {\
 		printf("%sFor "#var" using default: %"#form"\n", prefix, var);\
@@ -88,6 +89,7 @@ bool file_exists(const LPCWSTR file_name)
 	std::ifstream file(file_name);
 	return file.good();
 }
+
 
 void create_config(const LPCWSTR file_name)
 {
@@ -188,17 +190,47 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 	}
 }
 
+
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
-	const auto find_pos = buffer.find(injectcmd);
-	if (find_pos != std::string::npos)
+	const auto find_pos_inject = buffer.find(injectcmd);
+	const auto find_pos_cinit = buffer.find(clientinit);
+
+	if (find_pos_inject != std::string::npos)
 	{
-		const int in_off = find_pos + injectcmd.size();
+		const int in_off = find_pos_inject + injectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 
 		replace_all(in_str, std::string("~s"), std::string(" "));
 
+		memcpy(packet, in_str.c_str(), in_str.length());
+		memset(packet + in_str.length(), ' ', length - in_str.length());
+
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	}
+	else if (find_pos_cinit != std::string::npos) 
+	{
+		const int client_ver = buffer.find("client_version="); //15
+		const int client_platform = buffer.find("client_platform="); //16
+		const int client_version_sign = buffer.find("client_version_sign="); //20
+		const int client_key_offset = buffer.find("client_key_offset="); //18
+		const int client_input_hardware = buffer.find("client_input_hardware="); //22
+
+
+		auto in_str = buffer;
+		//const std::string raw = R"(jvhhk75EV3nCGeewx4Y5zZmiZSN07q5ByKZ9Wlmg85aAbnw7c1jKq5\/Iq0zY6dfGwCEwuKod0I5lQcVLf2NTCg==)";
+
+		//CLIENT_VERSION_SIGN
+		in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
+		in_str.insert(client_version_sign + 20, R"(tdNngCAZ1ImAf7BxJzO4RXv5nBRsUERsrSOnMKVUFNQg6BS4Bzag0RFgLVzs2DRj19AC8+q5cXgH+5Ms50mTCA==)");
+		//CLIENT_PLATFORM
+		in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+	    in_str.insert(client_platform + 16, "Windows");
+		//CLIENT_VERSION
+		in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
+		in_str.insert(client_ver + 15, R"(3.1.7\s[Build:\s1513163251])");
+		
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 
