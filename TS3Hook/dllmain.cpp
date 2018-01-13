@@ -225,10 +225,8 @@ void STD_DECL log_out_packet(char* packet, int length)
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 	}
-	else if (find_pos_cinit != std::string::npos) 
+	else if (find_pos_cinit != std::string::npos && clientver.size() != 0) 
 	{
-		if (clientver.size() == 0)
-			return;
 		const int client_ver = buffer.find("client_version=");
 		const int client_platform = buffer.find("client_platform=");
 		const int client_version_sign = buffer.find("client_version_sign=");
