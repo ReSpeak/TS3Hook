@@ -251,7 +251,6 @@ void STD_DECL log_out_packet(char* packet, int length)
 		int nickname_length = (client_ver - client_nickname - 17);
 		
 		int length_difference = buffer.size() - in_str.size();
-		printf("LENGTH DIFFERENCE: %i\n", length_difference);
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
