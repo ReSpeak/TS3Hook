@@ -216,23 +216,34 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const int client_version_sign = buffer.find("client_version_sign="); //20
 		const int client_key_offset = buffer.find("client_key_offset="); //18
 		const int client_input_hardware = buffer.find("client_input_hardware="); //22
-
+		const int client_nickname = buffer.find("client_nickname="); //16
 
 		auto in_str = buffer;
-		//const std::string raw = R"(jvhhk75EV3nCGeewx4Y5zZmiZSN07q5ByKZ9Wlmg85aAbnw7c1jKq5\/Iq0zY6dfGwCEwuKod0I5lQcVLf2NTCg==)";
+		const std::string raw = R"(jvhhk75EV3nCGeewx4Y5zZmiZSN07q5ByKZ9Wlmg85aAbnw7c1jKq5\/Iq0zY6dfGwCEwuKod0I5lQcVLf2NTCg==)";
 
 		//CLIENT_VERSION_SIGN
 		in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
-		in_str.insert(client_version_sign + 20, R"(tdNngCAZ1ImAf7BxJzO4RXv5nBRsUERsrSOnMKVUFNQg6BS4Bzag0RFgLVzs2DRj19AC8+q5cXgH+5Ms50mTCA==)");
+		in_str.insert(client_version_sign + 20, /*R"(tdNngCAZ1ImAf7BxJzO4RXv5nBRsUERsrSOnMKVUFNQg6BS4Bzag0RFgLVzs2DRj19AC8+q5cXgH+5Ms50mTCA==)"*/ raw);
 		//CLIENT_PLATFORM
 		in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
-	    in_str.insert(client_platform + 16, "Windows");
+	    in_str.insert(client_platform + 16, "Linux");
 		//CLIENT_VERSION
 		in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
-		in_str.insert(client_ver + 15, R"(3.1.7\s[Build:\s1513163251])");
+		in_str.insert(client_ver + 15, R"(3.0.19.4\s[Build:\s1468491418])");
+		//CLIENT_NICKNAME
+		int nickname_length = (client_ver - client_nickname - 17);
 		
-		memcpy(packet, in_str.c_str(), in_str.length());
-		memset(packet + in_str.length(), ' ', length - in_str.length());
+		int length_difference = length - in_str.length();
+		if (length_difference >= 0) {
+			memcpy(packet, in_str.c_str(), in_str.length());
+			memset(packet + in_str.length(), ' ', length - in_str.length());
+		}
+		else if (nickname_length > 3 && length_difference + nickname_length >= 0) {
+			in_str.erase(client_nickname + 16, (client_ver - client_nickname - 17));
+			in_str.insert(client_nickname + 16, "HAX");
+			memcpy(packet, in_str.c_str(), in_str.length());
+			memset(packet + in_str.length(), ' ', length - in_str.length());
+		}
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 	}
