@@ -105,7 +105,7 @@ void create_config(const LPCWSTR file_name)
 }
 
 void replace_all(std::string& str, const std::string& from, const std::string& to) {
-	if (from.empty())
+	if (from.empty() || str.empty())
 		return;
 	size_t start_pos = 0;
 	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
@@ -164,8 +164,10 @@ void read_config()
 	}
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list_vertical(splitbuffer, clientver);
-	replace_all(clientver[0], " ", R"(\s)");
-	replace_all(clientver[2], "/", R"(\/)");
+	if (clientver.size() > 0) {
+		replace_all(clientver[0], " ", R"(\s)");
+		replace_all(clientver[2], "/", R"(\/)");
+	}
 	printf("\n");
 	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
 	//CONFSETT(injectcmd, ls);
@@ -225,6 +227,8 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	else if (find_pos_cinit != std::string::npos) 
 	{
+		if (clientver.size() == 0)
+			return;
 		const int client_ver = buffer.find("client_version=");
 		const int client_platform = buffer.find("client_platform=");
 		const int client_version_sign = buffer.find("client_version_sign=");
