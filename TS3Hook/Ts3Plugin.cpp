@@ -29,9 +29,8 @@ int ts3plugin_apiVersion() {
 	return target;
 }
 
-const char* ts3plugin_author() { return "Splamy, Bluscream, alex720, exp111"; }
+const char* ts3plugin_author() { return "Splamy, Bluscream, alex720, exp111, Nicer"; }
 const char* ts3plugin_description() { return "Prints command packets on the console.\n\nhttps://github.com/ReSpeak/TS3Hook"; }
-void ts3plugin_setFunctionPointers(void* funcs) { }
 
 int ts3plugin_init() {
 	printf("-= %s v%s by %s =-\n", ts3plugin_name(), ts3plugin_version(), ts3plugin_author());
