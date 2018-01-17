@@ -1,6 +1,6 @@
 ﻿// dllmain.cpp : Defines the entry point for the DLL application.
 #include "main.h"
-#include "include\ts3_functions.h"
+#include "include/ts3_functions.h"
 #include <cstdio>
 #include "PatchTools.h"
 #include <string>
@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iterator>
 #include <fstream>
+#include <algorithm>
 
 #define PLUGINS_EXPORTDLL __declspec(dllexport)
 
@@ -81,6 +82,23 @@ uint64 cid;
 	} else {\
 		printf("%sFor "#var" using: %"#form"\n", prefix, var);\
 	}
+
+std::string random_string(size_t length)
+{
+	auto randchar = []() -> char
+	{
+		const char charset[] =
+			"0123456789"
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			"abcdefghijklmnopqrstuvwxyz";
+		const size_t max_index = (sizeof(charset) - 1);
+		return charset[rand() % max_index];
+	};
+	std::string str(length, 0);
+	std::generate_n(str.begin(), length, randchar);
+	return str;
+}
+
 
 template<typename Out>
 void split(const std::string &s, const char delim, Out result) {
@@ -189,7 +207,7 @@ void read_config()
 	}
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list_vertical(splitbuffer, clientver);
-	if (clientver.size() > 0) {
+	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
@@ -250,7 +268,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 	}
-	else if (find_pos_cinit != std::string::npos && clientver.size() != 0) 
+	else if (find_pos_cinit != std::string::npos && !clientver.empty()) 
 	{
 		const int client_ver = buffer.find("client_version=");
 		const int client_platform = buffer.find("client_platform=");
@@ -259,19 +277,19 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const int client_input_hardware = buffer.find("client_input_hardware=");
 		const int client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
-		if (clientver[2] != "") {
+		if (!clientver[2].empty()) {
 			in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
 			in_str.insert(client_version_sign + 20, clientver[2]);
 		}
-		if (clientver[1] != "") {
+		if (!clientver[1].empty()) {
 			in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
 			in_str.insert(client_platform + 16, clientver[1]);
 		}
-		if (clientver[0] != "") {
+		if (!clientver[0].empty()) {
 			in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
 			in_str.insert(client_ver + 15, clientver[0]);
 		}
-		int nickname_length = (client_ver - client_nickname - 17);
+		auto nickname_length = (client_ver - client_nickname - 17);
 		
 		int length_difference = buffer.size() - in_str.size();
 		if (length_difference >= 0) {
@@ -282,7 +300,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			nickname = in_str.substr(client_nickname + 16, (client_ver - client_nickname - 17));
 			nick_change_needed = true;
 			in_str.erase(client_nickname + 16, (client_ver - client_nickname - 17));
-			in_str.insert(client_nickname + 16, "HAX");
+			in_str.insert(client_nickname + 16, random_string(3));
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
 		}
