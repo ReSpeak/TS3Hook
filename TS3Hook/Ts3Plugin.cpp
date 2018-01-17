@@ -5,7 +5,7 @@
 #define PLUGIN_API_VERSION 22
 
 const char* ts3plugin_name() { return "TS3Hook"; }
-const char* ts3plugin_version() { return "1.2.1"; }
+const char* ts3plugin_version() { return "1.2"; }
 
 int ts3plugin_apiVersion() {
 	int target = -1;
