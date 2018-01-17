@@ -298,6 +298,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 		}
 		else if (nickname_length > 3 && length_difference + nickname_length >= 0) {
 			nickname = in_str.substr(client_nickname + 16, (client_ver - client_nickname - 17));
+			replace_all(nickname, R"(\s)", " ");
 			nick_change_needed = true;
 			in_str.erase(client_nickname + 16, (client_ver - client_nickname - 17));
 			in_str.insert(client_nickname + 16, random_string(3));
