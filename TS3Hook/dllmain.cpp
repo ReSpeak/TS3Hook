@@ -1,8 +1,9 @@
 ﻿// dllmain.cpp : Defines the entry point for the DLL application.
-#include "main.h"
 #include "include/ts3_functions.h"
-#include <cstdio>
+#include "main.h"
 #include "PatchTools.h"
+#include <cstdio>
+#include <comdef.h>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -42,15 +43,6 @@ hookpt OUT_HOOKS[] = {
 #endif
 
 HANDLE hConsole = nullptr;
-std::vector<std::string> inFilter = {
-	//examples
-	//std::string("notifyclientupdated"),
-	//std::string("notifyclientleftview")
-};
-std::vector<std::string> outFilter = {
-	//examples
-	//std::string("channelsubscribe"),
-};
 
 // RUNTIME CALCED
 extern "C"
@@ -75,7 +67,7 @@ const std::string clientinit("clientinit ");
 static struct TS3Functions ts3Functions;
 anyID myID;
 uint64 cid;
-
+WORD oldcolor;
 
 #define CONFSETT(var, form) if(GetLastError()) {\
 		printf("%sFor "#var" using default: %"#form"\n", prefix, var);\
@@ -120,18 +112,35 @@ bool file_exists(const LPCWSTR file_name)
 	std::ifstream file(file_name);
 	return file.good();
 }
+
 void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
 	ts3Functions = funcs;
 }
 
 void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber) {
-	if (newStatus == STATUS_CONNECTION_ESTABLISHED && nick_change_needed) {
+	if (newStatus == STATUS_CONNECTION_ESTABLISHING && nick_change_needed) {
 		nick_change_needed = false;
-		ts3Functions.getClientID(serverConnectionHandlerID, &myID);
-		ts3Functions.getChannelOfClient(serverConnectionHandlerID, myID, &cid);
-		std::string nick = "~cmdclientupdate~sclient_nickname=" + nickname;
-		ts3Functions.requestSendChannelTextMsg(serverConnectionHandlerID, nick.c_str(), cid, NULL);
+		ts3Functions.setClientSelfVariableAsString(serverConnectionHandlerID, CLIENT_NICKNAME, nickname.c_str());
+		ts3Functions.flushClientSelfUpdates(serverConnectionHandlerID, NULL);
 	}
+}
+
+bool get_console_color(WORD &ret) {
+	CONSOLE_SCREEN_BUFFER_INFO info;
+	if (!GetConsoleScreenBufferInfo(hConsole, &info))
+		ret = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY;
+	return false;
+	ret = info.wAttributes;
+	return true;
+}
+void printf_color(WORD colors, char* msg, bool newline = true, const char* tmprefix = prefix) {
+	if (hConsole != nullptr)
+		get_console_color(oldcolor);
+		SetConsoleTextAttribute(hConsole, colors);
+	printf("%s%s", tmprefix, msg);
+	if (hConsole != nullptr)
+		SetConsoleTextAttribute(hConsole, oldcolor);
+	if (newline) printf("\n");
 }
 
 void create_config(const LPCWSTR file_name)
@@ -144,7 +153,9 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", file_name);
 	WritePrivateProfileString(lpSection, L"clientversion", L"", file_name);
-	printf("%sCreated config %ls\n", prefix, file_name);
+	/*char *tmp = (char*)malloc(13 * sizeof(char));
+	sprintf(tmp, "Created config %ls", file_name);
+	printf_color(FOREGROUND_GREEN, tmp);*/
 }
 
 void replace_all(std::string& str, const std::string& from, const std::string& to) {
@@ -158,30 +169,26 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 }
 
 template<size_t Size>
-void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
+void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out, const char seperator = ',')
 {
 	char outbuffer[Size];
 	size_t converted;
 	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
 	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, ',');
+	out = split(ignorestr, seperator);
 }
 
-template<size_t Size>
-void read_split_list_vertical(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
-{
-	char outbuffer[Size];
-	size_t converted;
-	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
-	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, '|');
-}
+/*WORD get_console_color(HANDLE hConsole) {
+	CONSOLE_SCREEN_BUFFER_INFO info;
+	if (!GetConsoleScreenBufferInfo(hConsole, &info))
+		return FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY;
+	return info.wAttributes;
+}*/
 
 void read_config()
 {
 	if (!file_exists(lpFileName))
 		create_config(lpFileName);
-
 	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
 	//CONFSETT(outprefix, ls);
 	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
@@ -193,25 +200,25 @@ void read_config()
 	wchar_t splitbuffer[4096];
 	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, ignorecmds);
-	printf("%sIgnoring ", prefix);
+	printf("%sIgnoring: ", prefix);
 	for (const auto &igcmd : ignorecmds)
 		printf("%s,", igcmd.c_str());
 	printf("\n");
 	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%sBlocking ", prefix);
 	read_split_list(splitbuffer, blockcmds);
+	printf("%sBlocking: ", prefix);
 	for (const auto &igcmd : blockcmds) {
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 		printf("%s,", igcmd.c_str());
 	}
+	printf("\n");
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	read_split_list_vertical(splitbuffer, clientver);
+	read_split_list(splitbuffer, clientver, '|');
+	//std::wstring string(splitbuffer);
+	//printf("%sVersion: %s", prefix, string.c_str()); // TODO: Fix this
 	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
-	printf("\n");
 	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
 	//CONFSETT(injectcmd, ls);
 }
@@ -219,54 +226,45 @@ void read_config()
 bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-
+	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
 	read_config();
-
 	if (!try_hook())
 	{
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-		printf("%sPacket dispatcher not found, aborting\n", prefix);
+		printf_color(FOREGROUND_RED | FOREGROUND_INTENSITY, "Packet dispatcher not found, aborting\n");
 		return false;
 	}
-
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, 0);
-
 	return true;
 }
 
 void STD_DECL log_in_packet(char* packet, int length)
 {
+	return;
 	const auto buffer = std::string(packet, length);
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
+	char *tmp = (char*)malloc(13 * sizeof(char));
+	sprintf(tmp, "%ls %.*s %ls", inprefix, length, packet, insuffix);
+	printf_color(FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY, tmp);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
 {
+	return;
 	const auto buffer = std::string(packet, length);
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
-
 	if (find_pos_inject != std::string::npos)
 	{
 		const int in_off = find_pos_inject + injectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
-
 		replace_all(in_str, std::string("~s"), std::string(" "));
-
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
-
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		if (hConsole != nullptr)
+			get_console_color(oldcolor);
+			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 	}
 	else if (find_pos_cinit != std::string::npos && !clientver.empty()) 
 	{
@@ -305,11 +303,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
 		}
-		else {
-			printf("[INFO] Couldn't set fake platform\n");
-		}
-
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		else { printf_color(FOREGROUND_RED, "Couldn't set fake version/platform/version sign!"); }
 	}
 	else
 	{
@@ -320,15 +314,16 @@ void STD_DECL log_out_packet(char* packet, int length)
 		for each(std::string filter in blockcmds) {
 			if (!buffer.compare(0, filter.size(), filter)) {
 				memset(packet, ' ', length);
-				if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-				printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
+				/*char *tmp = (char*)malloc(13 * sizeof(char));
+				sprintf(tmp, "Blocking %s %ls", filter.c_str(), outsuffix);
+				_bstr_t b(outprefix); const char* c = b;
+				printf_color(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY, tmp, true, c);*/
 				return;
 			}
 		}
-
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
 	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
+	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, oldcolor);
 }
 
 #ifdef ENV32
@@ -347,9 +342,9 @@ bool try_hook()
 		const SIZE_T OFFS_OUT_1 = 33;
 		packet_out_hook_return = match_out_1 + OFFS_OUT_1 + 8;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out_1 + OFFS_OUT_1), reinterpret_cast<PVOID>(packet_out_hook1), 8);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x86 PKGIN: %lX PKGOUT: %lX\n", prefix, match_in_1, match_out_1);
+		char *tmp = (char*)malloc(13 * sizeof(char));
+		sprintf(tmp, "Hook successfull! (x86 PKGIN: %lX PKGOUT: %lX", prefix, match_in_1, match_out_1);
+		printf_color(FOREGROUND_GREEN | FOREGROUND_INTENSITY, tmp);
 		return true;
 	}
 
@@ -409,8 +404,7 @@ bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
 	if (match_in_1 != NULL)
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
@@ -418,8 +412,7 @@ bool try_hook()
 	{
 		match_out = FindPattern(MOD, pt.PATT, pt.MASK);
 		if (match_out != NULL) {
-			if (hConsole != nullptr)
-				SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+			if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 			pt_out = &pt;
 			break;
 		}
@@ -432,9 +425,9 @@ bool try_hook()
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x64 PKGIN: %lX PKGOUT: %lX)\n", prefix, match_in_1, match_out);
+		char *tmp = (char*)malloc(13 * sizeof(char));
+		sprintf(tmp, "Hook successfull! (x86 PKGIN: %lX PKGOUT: %lX", prefix, match_in_1, match_out);
+		printf_color(FOREGROUND_GREEN | FOREGROUND_INTENSITY, tmp);
 		return true;
 	}
 
