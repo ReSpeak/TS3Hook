@@ -9,6 +9,8 @@
 #include <iterator>
 #include <fstream>
 #include <algorithm>
+#include <stdio.h>
+#include <wincon.h>
 
 #define PLUGINS_EXPORTDLL __declspec(dllexport)
 
@@ -72,7 +74,8 @@ std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
 const std::string clientinit("clientinit ");
-static struct TS3Functions ts3Functions;
+const std::string sendtextmessage("sendtextmessage ");
+static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
 
@@ -121,16 +124,16 @@ bool file_exists(const LPCWSTR file_name)
 	return file.good();
 }
 void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
-	ts3Functions = funcs;
+	ts3_functions = funcs;
 }
 
 void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber) {
 	if (newStatus == STATUS_CONNECTION_ESTABLISHED && nick_change_needed) {
 		nick_change_needed = false;
-		ts3Functions.getClientID(serverConnectionHandlerID, &myID);
-		ts3Functions.getChannelOfClient(serverConnectionHandlerID, myID, &cid);
+		ts3_functions.getClientID(serverConnectionHandlerID, &myID);
+		ts3_functions.getChannelOfClient(serverConnectionHandlerID, myID, &cid);
 		std::string nick = "~cmdclientupdate~sclient_nickname=" + nickname;
-		ts3Functions.requestSendChannelTextMsg(serverConnectionHandlerID, nick.c_str(), cid, NULL);
+		ts3_functions.requestSendChannelTextMsg(serverConnectionHandlerID, nick.c_str(), cid, NULL);
 	}
 }
 
@@ -255,6 +258,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 	const auto buffer = std::string(packet, length);
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
+	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
 
 	if (find_pos_inject != std::string::npos)
 	{
@@ -268,7 +272,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 
 		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 	}
-	else if (find_pos_cinit != std::string::npos && !clientver.empty()) 
+	else if (find_pos_cinit != std::string::npos && find_pos_sendcmd == std::string::npos && !clientver.empty())
 	{
 		const int client_ver = buffer.find("client_version=");
 		const int client_platform = buffer.find("client_platform=");
@@ -278,7 +282,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const int client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
-			in_str.erase(client_version_sign + 20, (client_key_offset - client_version_sign - 21));
+			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
 			in_str.insert(client_version_sign + 20, clientver[2]);
 		}
 		if (!clientver[1].empty()) {
