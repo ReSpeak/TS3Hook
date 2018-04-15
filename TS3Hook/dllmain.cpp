@@ -9,8 +9,6 @@
 #include <iterator>
 #include <fstream>
 #include <algorithm>
-#include <stdio.h>
-#include <wincon.h>
 
 #define PLUGINS_EXPORTDLL __declspec(dllexport)
 
@@ -42,6 +40,19 @@ hookpt OUT_HOOKS[] = {
 	hookpt{ 17, 17, packet_out_hook3, "\x48\x8B\x10\x48\x89\x54\x24\x50\x48\x89\x54\x24\x78\x48\x8B\x58\x08", "xxxxxxxxxxxxxxxxx" }
 };
 #endif
+
+#define CRED (FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define CGREEN (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CBLUE (FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+#define CYELLOW (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CCYAN (FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CPINK (FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+
+#define CWRITE(color, format, ...) {\
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, color);\
+		printf (format, __VA_ARGS__);\
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, 15);\
+	}
 
 HANDLE hConsole = nullptr;
 std::vector<std::string> inFilter = {
@@ -161,23 +172,13 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 }
 
 template<size_t Size>
-void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
+void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out, char split_char)
 {
 	char outbuffer[Size];
 	size_t converted;
 	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
 	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, ',');
-}
-
-template<size_t Size>
-void read_split_list_vertical(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
-{
-	char outbuffer[Size];
-	size_t converted;
-	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
-	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, '|');
+	out = split(ignorestr, split_char);
 }
 
 void read_config()
@@ -195,26 +196,23 @@ void read_config()
 	//CONFSETT(insuffix, ls);
 	wchar_t splitbuffer[4096];
 	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	read_split_list(splitbuffer, ignorecmds);
-	printf("%sIgnoring ", prefix);
-	for (const auto &igcmd : ignorecmds)
-		printf("%s,", igcmd.c_str());
+	read_split_list(splitbuffer, ignorecmds, ',');
+	CWRITE(CCYAN, "%sIgnoring ", prefix);
+	for (const auto &cmd : ignorecmds)
+		printf("%s,", cmd.c_str());
 	printf("\n");
 	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%sBlocking ", prefix);
-	read_split_list(splitbuffer, blockcmds);
-	for (const auto &igcmd : blockcmds) {
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%s,", igcmd.c_str());
-	}
+	CWRITE(CYELLOW, "%sBlocking ", prefix);
+	read_split_list(splitbuffer, blockcmds, ',');
+	for (const auto &cmd : blockcmds)
+		CWRITE(CYELLOW, "%s,", cmd.c_str());
+	printf("\n");
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	read_split_list_vertical(splitbuffer, clientver);
+	read_split_list(splitbuffer, clientver, '|');
 	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
-	printf("\n");
 	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
 	//CONFSETT(injectcmd, ls);
 }
@@ -223,21 +221,13 @@ bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-
 	read_config();
 
 	if (!try_hook())
 	{
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-		printf("%sPacket dispatcher not found, aborting\n", prefix);
+		CWRITE(CRED, "%sPacket dispatcher not found, aborting\n", prefix);
 		return false;
 	}
-
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, 0);
 
 	return true;
 }
@@ -249,8 +239,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
+	CWRITE(CCYAN, "%ls %.*s %ls\n", inprefix, length, packet, insuffix);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
@@ -259,10 +248,11 @@ void STD_DECL log_out_packet(char* packet, int length)
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
 	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
+	bool injected = false;
 
 	if (find_pos_inject != std::string::npos)
 	{
-		const int in_off = find_pos_inject + injectcmd.size();
+		const auto in_off = find_pos_inject + injectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 
 		replace_all(in_str, std::string("~s"), std::string(" "));
@@ -270,16 +260,16 @@ void STD_DECL log_out_packet(char* packet, int length)
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		injected = true;
 	}
 	else if (find_pos_cinit != std::string::npos && find_pos_sendcmd == std::string::npos && !clientver.empty())
 	{
-		const int client_ver = buffer.find("client_version=");
-		const int client_platform = buffer.find("client_platform=");
-		const int client_version_sign = buffer.find("client_version_sign=");
-		const int client_key_offset = buffer.find("client_key_offset=");
-		const int client_input_hardware = buffer.find("client_input_hardware=");
-		const int client_nickname = buffer.find("client_nickname=");
+		const auto client_ver = buffer.find("client_version=");
+		const auto client_platform = buffer.find("client_platform=");
+		const auto client_version_sign = buffer.find("client_version_sign=");
+		const auto client_key_offset = buffer.find("client_key_offset=");
+		const auto client_input_hardware = buffer.find("client_input_hardware=");
+		const auto client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
 			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
@@ -295,7 +285,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 		}
 		auto nickname_length = (client_ver - client_nickname - 17);
 		
-		int length_difference = buffer.size() - in_str.size();
+		const auto length_difference = buffer.size() - in_str.size();
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
@@ -313,7 +303,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			printf("[INFO] Couldn't set fake platform\n");
 		}
 
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		injected = true;
 	}
 	else
 	{
@@ -324,22 +314,19 @@ void STD_DECL log_out_packet(char* packet, int length)
 		for each(std::string filter in blockcmds) {
 			if (!buffer.compare(0, filter.size(), filter)) {
 				memset(packet, ' ', length);
-				if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-				printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
+				CWRITE(CYELLOW, "%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
 				return;
 			}
 		}
-
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
-	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
+
+	CWRITE(injected ? CPINK : CGREEN, "%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 
 #ifdef ENV32
 bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-
 	const auto match_out_1 = FindPattern(MOD, PATT_OUT_1, MASK_OUT_1);
 
 	if (match_in_1 != NULL && match_out_1 != NULL)
@@ -351,9 +338,8 @@ bool try_hook()
 		const SIZE_T OFFS_OUT_1 = 33;
 		packet_out_hook_return = match_out_1 + OFFS_OUT_1 + 8;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out_1 + OFFS_OUT_1), reinterpret_cast<PVOID>(packet_out_hook1), 8);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x86 PKGIN: %lX PKGOUT: %lX\n", prefix, match_in_1, match_out_1);
+
+		CWRITE(CGREEN, "%sHook successfull! (x86 PKGIN: %zX PKGOUT: %zX\n", prefix, match_in_1, match_out_1);
 		return true;
 	}
 
@@ -412,18 +398,16 @@ void __declspec(naked) packet_out_hook1()
 bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-	if (match_in_1 != NULL)
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	if (match_in_1 == NULL)
+		return false;
 
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
 	for (hookpt &pt : OUT_HOOKS)
 	{
 		match_out = FindPattern(MOD, pt.PATT, pt.MASK);
-		if (match_out != NULL) {
-			if (hConsole != nullptr)
-				SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		if (match_out != NULL)
+		{
 			pt_out = &pt;
 			break;
 		}
@@ -436,9 +420,7 @@ bool try_hook()
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x64 PKGIN: %lX PKGOUT: %lX)\n", prefix, match_in_1, match_out);
+		CWRITE(CGREEN, "%sHook successfull! (x64 PKGIN: %zX PKGOUT: %zX)\n", prefix, match_in_1, match_out);
 		return true;
 	}
 
