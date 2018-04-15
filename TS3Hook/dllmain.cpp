@@ -199,7 +199,7 @@ void read_config()
 	read_split_list(splitbuffer, ignorecmds, ',');
 	CWRITE(CCYAN, "%sIgnoring ", prefix);
 	for (const auto &cmd : ignorecmds)
-		printf("%s,", cmd.c_str());
+		CWRITE(CCYAN, "%s,", cmd.c_str());
 	printf("\n");
 	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	CWRITE(CYELLOW, "%sBlocking ", prefix);
