@@ -55,15 +55,6 @@ hookpt OUT_HOOKS[] = {
 	}
 
 HANDLE hConsole = nullptr;
-std::vector<std::string> inFilter = {
-	//examples
-	//std::string("notifyclientupdated"),
-	//std::string("notifyclientleftview")
-};
-std::vector<std::string> outFilter = {
-	//examples
-	//std::string("channelsubscribe"),
-};
 
 // RUNTIME CALCED
 extern "C"
@@ -80,12 +71,16 @@ WCHAR outprefix[256];
 WCHAR outsuffix[256];
 WCHAR inprefix[256];
 WCHAR insuffix[256];
+WCHAR bypass_modalquit[3];
+WCHAR in_to_plugincmd[3];
+WCHAR out_to_plugincmd[3];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
 const std::string clientinit("clientinit ");
 const std::string sendtextmessage("sendtextmessage ");
+const std::string initserver("initserver ");
 static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
@@ -155,9 +150,11 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"inprefix", L"[IN ]", file_name);
 	WritePrivateProfileString(lpSection, L"insuffix", L"", file_name);
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
-	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
-	WritePrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", file_name);
-	WritePrivateProfileString(lpSection, L"clientversion", L"", file_name);
+	WritePrivateProfileString(lpSection, L"blockcmds", L"connectioninfoautoupdate,setconnectioninfo,clientchatcomposing", file_name);
+	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
+	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name);
+	WritePrivateProfileString(lpSection, L"in_to_plugincmd", L"0", file_name);
+	WritePrivateProfileString(lpSection, L"out_to_plugincmd", L"0", file_name);
 	printf("%sCreated config %ls\n", prefix, file_name);
 }
 
@@ -207,14 +204,15 @@ void read_config()
 	for (const auto &cmd : blockcmds)
 		CWRITE(CYELLOW, "%s,", cmd.c_str());
 	printf("\n");
+	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, clientver, '|');
 	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
-	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
-	//CONFSETT(injectcmd, ls);
+	GetPrivateProfileString(lpSection, L"in_to_plugincmd", L"", in_to_plugincmd, sizeof(in_to_plugincmd), lpFileName);
+	GetPrivateProfileString(lpSection, L"out_to_plugincmd", L"", out_to_plugincmd, sizeof(out_to_plugincmd), lpFileName);
 }
 
 bool core_hook()
@@ -235,11 +233,26 @@ bool core_hook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
+	const auto find_pos_inits = buffer.find(initserver);
+	bool modified = false;
+	auto in_str = buffer;
+	if (find_pos_inits != std::string::npos) {
+		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
+		if (virtualserver_hostmessage_mode != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
+			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
+			ts3_functions.printMessageToCurrentTab("TS3Hook: The server you're connecting to has it's hostmessage mode set to MODALQUIT, but you can stay connected ;)");
+			modified = true;
+		}
+	}
+	if (modified) {
+		memcpy(packet, in_str.c_str(), in_str.length());
+		memset(packet + in_str.length(), ' ', length - in_str.length());
+	}
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	CWRITE(CCYAN, "%ls %.*s %ls\n", inprefix, length, packet, insuffix);
+	CWRITE(modified ? CPINK : CCYAN, "%ls %.*s %ls\n", inprefix, length, packet, insuffix);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
@@ -269,6 +282,9 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const auto client_version_sign = buffer.find("client_version_sign=");
 		const auto client_key_offset = buffer.find("client_key_offset=");
 		const auto client_input_hardware = buffer.find("client_input_hardware=");
+		const auto client_output_hardware = buffer.find("client_output_hardware="); // TODO
+		const auto client_input_muted = buffer.find("client_input_muted="); // TODO
+		const auto client_output_muted = buffer.find("client_output_muted="); // TODO
 		const auto client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
