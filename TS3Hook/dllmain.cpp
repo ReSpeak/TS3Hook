@@ -278,7 +278,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const int client_platform = buffer.find("client_platform=");
 		const int client_version_sign = buffer.find("client_version_sign=");
 		const int client_key_offset = buffer.find("client_key_offset=");
-		const int client_input_hardware = buffer.find("client_input_hardware=");
+		const int client_input_muted = buffer.find("client_input_muted=");
 		const int client_nickname = buffer.find("client_nickname=");
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
@@ -286,7 +286,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_version_sign + 20, clientver[2]);
 		}
 		if (!clientver[1].empty()) {
-			in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+			in_str.erase(client_platform + 16, (client_input_muted - client_platform - 17));
 			in_str.insert(client_platform + 16, clientver[1]);
 		}
 		if (!clientver[0].empty()) {
@@ -294,7 +294,6 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_ver + 15, clientver[0]);
 		}
 		auto nickname_length = (client_ver - client_nickname - 17);
-		
 		int length_difference = buffer.size() - in_str.size();
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
