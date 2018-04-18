@@ -233,14 +233,18 @@ bool core_hook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
+	if (wcscmp(L"1", in_to_plugincmd) == 0) {
+		ts3_functions.logMessage(packet, LogLevel_DEBUG, "TS3Hook IN", 0);
+	}
 	const auto find_pos_inits = buffer.find(initserver);
 	bool modified = false;
 	auto in_str = buffer;
 	if (find_pos_inits != std::string::npos) {
 		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
-		if (virtualserver_hostmessage_mode != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
+		const auto virtualserver_hostmessage_set = buffer.find("virtualserver_hostmessage=");
+		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
 			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
-			ts3_functions.printMessageToCurrentTab("TS3Hook: The server you're connecting to has it's hostmessage mode set to MODALQUIT, but you can stay connected ;)");
+			ts3_functions.printMessageToCurrentTab("TS3Hook: [color=green]The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[color=green], but you can stay connected ;)");
 			modified = true;
 		}
 	}
@@ -258,6 +262,21 @@ void STD_DECL log_in_packet(char* packet, int length)
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
+	if (wcscmp(L"1", out_to_plugincmd) == 0) {
+		/* ts3_functions.logMessage(buffer.c_str(), LogLevel_DEVEL, "TS3Hook OUT", 1);
+		
+		uint64* list;
+		ts3_functions.getServerConnectionHandlerList(&list);
+		for (unsigned int a = 0; a < sizeof(texts) / sizeof(texts[0]); a = a + 1)
+		//for (const uint64 &schid : list) {
+
+		}*/
+		/*string a = "TS3Hook: ";
+		const char *b = "world";
+		a += b;
+		const char *C = a.c_str();
+		ts3_functions.printMessageToCurrentTab(buffer.c_str());*/
+	}
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
 	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
