@@ -9,8 +9,6 @@
 #include <iterator>
 #include <fstream>
 #include <algorithm>
-#include <stdio.h>
-#include <wincon.h>
 
 #define PLUGINS_EXPORTDLL __declspec(dllexport)
 
@@ -43,16 +41,20 @@ hookpt OUT_HOOKS[] = {
 };
 #endif
 
+#define CRED (FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define CGREEN (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CBLUE (FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+#define CYELLOW (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CCYAN (FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CPINK (FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+
+#define CWRITE(color, format, ...) {\
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, color);\
+		printf (format, __VA_ARGS__);\
+		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, 15);\
+	}
+
 HANDLE hConsole = nullptr;
-std::vector<std::string> inFilter = {
-	//examples
-	//std::string("notifyclientupdated"),
-	//std::string("notifyclientleftview")
-};
-std::vector<std::string> outFilter = {
-	//examples
-	//std::string("channelsubscribe"),
-};
 
 // RUNTIME CALCED
 extern "C"
@@ -69,12 +71,16 @@ WCHAR outprefix[256];
 WCHAR outsuffix[256];
 WCHAR inprefix[256];
 WCHAR insuffix[256];
+WCHAR bypass_modalquit[3];
+WCHAR in_to_plugincmd[3];
+WCHAR out_to_plugincmd[3];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
 const std::string clientinit("clientinit ");
 const std::string sendtextmessage("sendtextmessage ");
+const std::string initserver("initserver ");
 static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
@@ -144,9 +150,11 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"inprefix", L"[IN ]", file_name);
 	WritePrivateProfileString(lpSection, L"insuffix", L"", file_name);
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
-	WritePrivateProfileString(lpSection, L"blockcmds", L"", file_name);
-	WritePrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", file_name);
-	WritePrivateProfileString(lpSection, L"clientversion", L"", file_name);
+	WritePrivateProfileString(lpSection, L"blockcmds", L"connectioninfoautoupdate,setconnectioninfo,clientchatcomposing", file_name);
+	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
+	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name);
+	WritePrivateProfileString(lpSection, L"in_to_plugincmd", L"0", file_name);
+	WritePrivateProfileString(lpSection, L"out_to_plugincmd", L"0", file_name);
 	printf("%sCreated config %ls\n", prefix, file_name);
 }
 
@@ -161,23 +169,13 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 }
 
 template<size_t Size>
-void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
+void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out, char split_char)
 {
 	char outbuffer[Size];
 	size_t converted;
 	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
 	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, ',');
-}
-
-template<size_t Size>
-void read_split_list_vertical(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out)
-{
-	char outbuffer[Size];
-	size_t converted;
-	wcstombs_s<Size>(&converted, outbuffer, splitbuffer, Size);
-	const std::string ignorestr(outbuffer, converted - 1);
-	out = split(ignorestr, '|');
+	out = split(ignorestr, split_char);
 }
 
 void read_config()
@@ -195,49 +193,39 @@ void read_config()
 	//CONFSETT(insuffix, ls);
 	wchar_t splitbuffer[4096];
 	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	read_split_list(splitbuffer, ignorecmds);
-	printf("%sIgnoring ", prefix);
-	for (const auto &igcmd : ignorecmds)
-		printf("%s,", igcmd.c_str());
+	read_split_list(splitbuffer, ignorecmds, ',');
+	CWRITE(CCYAN, "%sIgnoring ", prefix);
+	for (const auto &cmd : ignorecmds)
+		CWRITE(CCYAN, "%s,", cmd.c_str());
 	printf("\n");
 	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%sBlocking ", prefix);
-	read_split_list(splitbuffer, blockcmds);
-	for (const auto &igcmd : blockcmds) {
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%s,", igcmd.c_str());
-	}
+	CWRITE(CYELLOW, "%sBlocking ", prefix);
+	read_split_list(splitbuffer, blockcmds, ',');
+	for (const auto &cmd : blockcmds)
+		CWRITE(CYELLOW, "%s,", cmd.c_str());
+	printf("\n");
+	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
-	read_split_list_vertical(splitbuffer, clientver);
+	read_split_list(splitbuffer, clientver, '|');
 	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
-	printf("\n");
-	//GetPrivateProfileString(lpSection, L"injectcmd", L" msg=~cmd", injectcmd, sizeof(injectcmd), lpFileName);
-	//CONFSETT(injectcmd, ls);
+	GetPrivateProfileString(lpSection, L"in_to_plugincmd", L"", in_to_plugincmd, sizeof(in_to_plugincmd), lpFileName);
+	GetPrivateProfileString(lpSection, L"out_to_plugincmd", L"", out_to_plugincmd, sizeof(out_to_plugincmd), lpFileName);
 }
 
 bool core_hook()
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-
 	read_config();
 
 	if (!try_hook())
 	{
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-		printf("%sPacket dispatcher not found, aborting\n", prefix);
+		CWRITE(CRED, "%sPacket dispatcher not found, aborting\n", prefix);
 		return false;
 	}
-
-	if (hConsole != nullptr)
-		SetConsoleTextAttribute(hConsole, 0);
 
 	return true;
 }
@@ -245,24 +233,58 @@ bool core_hook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
+	if (wcscmp(L"1", in_to_plugincmd) == 0) {
+		ts3_functions.logMessage(packet, LogLevel_DEBUG, "TS3Hook IN", 0);
+	}
+	const auto find_pos_inits = buffer.find(initserver);
+	bool modified = false;
+	auto in_str = buffer;
+	if (find_pos_inits != std::string::npos) {
+		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
+		const auto virtualserver_hostmessage_set = buffer.find("virtualserver_hostmessage=");
+		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
+			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
+			ts3_functions.printMessageToCurrentTab("TS3Hook: [color=green]The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[color=green], but you can stay connected ;)");
+			modified = true;
+		}
+	}
+	if (modified) {
+		memcpy(packet, in_str.c_str(), in_str.length());
+		memset(packet + in_str.length(), ' ', length - in_str.length());
+	}
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
-	if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	printf("%ls %.*s %ls\n", inprefix, length, packet, insuffix);
+	CWRITE(modified ? CPINK : CCYAN, "%ls %.*s %ls\n", inprefix, length, packet, insuffix);
 }
 
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
+	if (wcscmp(L"1", out_to_plugincmd) == 0) {
+		/* ts3_functions.logMessage(buffer.c_str(), LogLevel_DEVEL, "TS3Hook OUT", 1);
+		
+		uint64* list;
+		ts3_functions.getServerConnectionHandlerList(&list);
+		for (unsigned int a = 0; a < sizeof(texts) / sizeof(texts[0]); a = a + 1)
+		//for (const uint64 &schid : list) {
+
+		}*/
+		/*string a = "TS3Hook: ";
+		const char *b = "world";
+		a += b;
+		const char *C = a.c_str();
+		ts3_functions.printMessageToCurrentTab(buffer.c_str());*/
+	}
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
 	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
+	bool injected = false;
 
 	if (find_pos_inject != std::string::npos)
 	{
-		const int in_off = find_pos_inject + injectcmd.size();
+		const auto in_off = find_pos_inject + injectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 
 		replace_all(in_str, std::string("~s"), std::string(" "));
@@ -270,16 +292,28 @@ void STD_DECL log_out_packet(char* packet, int length)
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		injected = true;
 	}
 	else if (find_pos_cinit != std::string::npos && find_pos_sendcmd == std::string::npos && !clientver.empty())
 	{
+<<<<<<< HEAD
 		const int client_ver = buffer.find("client_version=");
 		const int client_platform = buffer.find("client_platform=");
 		const int client_version_sign = buffer.find("client_version_sign=");
 		const int client_key_offset = buffer.find("client_key_offset=");
 		const int client_input_muted = buffer.find("client_input_muted=");
 		const int client_nickname = buffer.find("client_nickname=");
+=======
+		const auto client_ver = buffer.find("client_version=");
+		const auto client_platform = buffer.find("client_platform=");
+		const auto client_version_sign = buffer.find("client_version_sign=");
+		const auto client_key_offset = buffer.find("client_key_offset=");
+		const auto client_input_hardware = buffer.find("client_input_hardware=");
+		const auto client_output_hardware = buffer.find("client_output_hardware="); // TODO
+		const auto client_input_muted = buffer.find("client_input_muted="); // TODO
+		const auto client_output_muted = buffer.find("client_output_muted="); // TODO
+		const auto client_nickname = buffer.find("client_nickname=");
+>>>>>>> pr/1
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
 			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
@@ -294,7 +328,12 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_ver + 15, clientver[0]);
 		}
 		auto nickname_length = (client_ver - client_nickname - 17);
+<<<<<<< HEAD
 		int length_difference = buffer.size() - in_str.size();
+=======
+		
+		const auto length_difference = buffer.size() - in_str.size();
+>>>>>>> pr/1
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
@@ -312,7 +351,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			printf("[INFO] Couldn't set fake platform\n");
 		}
 
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+		injected = true;
 	}
 	else
 	{
@@ -323,22 +362,19 @@ void STD_DECL log_out_packet(char* packet, int length)
 		for each(std::string filter in blockcmds) {
 			if (!buffer.compare(0, filter.size(), filter)) {
 				memset(packet, ' ', length);
-				if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-				printf("%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
+				CWRITE(CYELLOW, "%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
 				return;
 			}
 		}
-
-		if (hConsole != nullptr) SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 	}
-	printf("%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
+
+	CWRITE(injected ? CPINK : CGREEN, "%ls %.*s %ls\n", outprefix, length, packet, outsuffix);
 }
 
 #ifdef ENV32
 bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-
 	const auto match_out_1 = FindPattern(MOD, PATT_OUT_1, MASK_OUT_1);
 
 	if (match_in_1 != NULL && match_out_1 != NULL)
@@ -350,9 +386,8 @@ bool try_hook()
 		const SIZE_T OFFS_OUT_1 = 33;
 		packet_out_hook_return = match_out_1 + OFFS_OUT_1 + 8;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out_1 + OFFS_OUT_1), reinterpret_cast<PVOID>(packet_out_hook1), 8);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x86 PKGIN: %lX PKGOUT: %lX\n", prefix, match_in_1, match_out_1);
+
+		CWRITE(CGREEN, "%sHook successfull! (x86 PKGIN: %zX PKGOUT: %zX\n", prefix, match_in_1, match_out_1);
 		return true;
 	}
 
@@ -411,18 +446,16 @@ void __declspec(naked) packet_out_hook1()
 bool try_hook()
 {
 	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-	if (match_in_1 != NULL)
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	if (match_in_1 == NULL)
+		return false;
 
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
 	for (hookpt &pt : OUT_HOOKS)
 	{
 		match_out = FindPattern(MOD, pt.PATT, pt.MASK);
-		if (match_out != NULL) {
-			if (hConsole != nullptr)
-				SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+		if (match_out != NULL)
+		{
 			pt_out = &pt;
 			break;
 		}
@@ -435,9 +468,7 @@ bool try_hook()
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
-		if (hConsole != nullptr)
-			SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-		printf("%sHook successfull! (x64 PKGIN: %lX PKGOUT: %lX)\n", prefix, match_in_1, match_out);
+		CWRITE(CGREEN, "%sHook successfull! (x64 PKGIN: %zX PKGOUT: %zX)\n", prefix, match_in_1, match_out);
 		return true;
 	}
 
