@@ -296,14 +296,6 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	else if (find_pos_cinit != std::string::npos && find_pos_sendcmd == std::string::npos && !clientver.empty())
 	{
-<<<<<<< HEAD
-		const int client_ver = buffer.find("client_version=");
-		const int client_platform = buffer.find("client_platform=");
-		const int client_version_sign = buffer.find("client_version_sign=");
-		const int client_key_offset = buffer.find("client_key_offset=");
-		const int client_input_muted = buffer.find("client_input_muted=");
-		const int client_nickname = buffer.find("client_nickname=");
-=======
 		const auto client_ver = buffer.find("client_version=");
 		const auto client_platform = buffer.find("client_platform=");
 		const auto client_version_sign = buffer.find("client_version_sign=");
@@ -313,7 +305,6 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const auto client_input_muted = buffer.find("client_input_muted="); // TODO
 		const auto client_output_muted = buffer.find("client_output_muted="); // TODO
 		const auto client_nickname = buffer.find("client_nickname=");
->>>>>>> pr/1
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
 			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
@@ -328,12 +319,8 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_ver + 15, clientver[0]);
 		}
 		auto nickname_length = (client_ver - client_nickname - 17);
-<<<<<<< HEAD
-		int length_difference = buffer.size() - in_str.size();
-=======
 		
 		const auto length_difference = buffer.size() - in_str.size();
->>>>>>> pr/1
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
