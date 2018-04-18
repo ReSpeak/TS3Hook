@@ -264,7 +264,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 	const auto buffer = std::string(packet, length);
 	if (wcscmp(L"1", out_to_plugincmd) == 0) {
 		/* ts3_functions.logMessage(buffer.c_str(), LogLevel_DEVEL, "TS3Hook OUT", 1);
-		
+
 		uint64* list;
 		ts3_functions.getServerConnectionHandlerList(&list);
 		for (unsigned int a = 0; a < sizeof(texts) / sizeof(texts[0]); a = a + 1)
@@ -305,13 +305,21 @@ void STD_DECL log_out_packet(char* packet, int length)
 		const auto client_input_muted = buffer.find("client_input_muted="); // TODO
 		const auto client_output_muted = buffer.find("client_output_muted="); // TODO
 		const auto client_nickname = buffer.find("client_nickname=");
+
 		auto in_str = buffer;
+
 		if (!clientver[2].empty()) {
 			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
 			in_str.insert(client_version_sign + 20, clientver[2]);
 		}
 		if (!clientver[1].empty()) {
-			in_str.erase(client_platform + 16, (client_input_muted - client_platform - 17));
+			long length_check = (client_input_muted - client_platform - 17);
+
+			if (length_check > 0)
+				in_str.erase(client_platform + 16, (client_input_muted - client_platform - 17));
+			else
+				in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+
 			in_str.insert(client_platform + 16, clientver[1]);
 		}
 		if (!clientver[0].empty()) {
@@ -319,7 +327,7 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_ver + 15, clientver[0]);
 		}
 		auto nickname_length = (client_ver - client_nickname - 17);
-		
+
 		const auto length_difference = buffer.size() - in_str.size();
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
