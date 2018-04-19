@@ -78,13 +78,15 @@ std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
 const std::string injectcmd(" msg=~cmd");
+const std::string outjectcmd(" msg=-cmd");
 const std::string clientinit("clientinit ");
 const std::string sendtextmessage("sendtextmessage ");
-const std::string initserver("initserver ");
+const std::string notifytextmessage("notifytextmessage ");
+const std::string hostmsg_mode("virtualserver_hostmessage_mode=3");
+const std::string not_implemented("error id=2 msg=not\\simplemented");
 static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
-
 
 #define CONFSETT(var, form) if(GetLastError()) {\
 		printf("%sFor "#var" using default: %"#form"\n", prefix, var);\
@@ -145,18 +147,8 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 
 int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char * errorMessage, unsigned int error, const char * returnCode, const char * extraMessage)
 {
-	if (error == 2 && strcmp(errorMessage, "not implemented") == 0 && wcscmp(L"1", teaspeak_anti_error) == 0) {
+	if (strcmp(returnCode, "th") == 0)
 		return 1;
-		char *serverVersion;
-		if (ts3_functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_VERSION, &serverVersion) == 0) {
-			for (; *serverVersion; ++serverVersion) *serverVersion = tolower(*serverVersion);
-			if (strstr(serverVersion, "teaspeak") != NULL) {
-				ts3_functions.freeMemory(serverVersion);
-				return 1;
-			}
-			ts3_functions.freeMemory(serverVersion);
-		}
-	}
 	return 0;
 }
 
@@ -249,21 +241,39 @@ bool core_hook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
-	const auto find_pos_inits = buffer.find(initserver);
+	const auto find_pos_inits = buffer.find("initserver ");
+	const auto find_pos_err = buffer.find(not_implemented);
+	const auto find_pos_outject = buffer.find(outjectcmd);
+	const auto find_pos_notcmd = buffer.find(notifytextmessage);
 	bool modified = false;
-	auto in_str = buffer;
-	if (find_pos_inits != std::string::npos) {
-		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
+
+	if (find_pos_outject != std::string::npos)
+	{
+		const auto in_off = find_pos_outject + outjectcmd.size();
+		auto in_str = std::string(packet + in_off, length - in_off);
+		replace_all(in_str, std::string("~s"), std::string(" "));
+		memcpy(packet, in_str.c_str(), in_str.length());
+		memset(packet + in_str.length(), ' ', length - in_str.length());
+		modified = true;
+	}
+	else if (find_pos_inits != std::string::npos) {
+		const auto virtualserver_hostmessage_mode = buffer.find(hostmsg_mode);
 		const auto virtualserver_hostmessage_set = buffer.find("virtualserver_hostmessage=");
 		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
-			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
+			auto in_str = buffer;
+			replace_all(in_str, hostmsg_mode, "virtualserver_hostmessage_mode=2");
+			memcpy(packet, in_str.c_str(), in_str.length());
+			memset(packet + in_str.length(), ' ', length - in_str.length());
 			ts3_functions.printMessageToCurrentTab("TS3Hook: The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[/color], but you can stay connected ;)");
 			modified = true;
 		}
 	}
-	if (modified) {
+	else if (find_pos_err != std::string::npos && wcscmp(L"1", teaspeak_anti_error) == 0) {
+		auto in_str = buffer;
+		replace_all(in_str, not_implemented, "error id=0 msg return_code=th");
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
+		modified = true;
 	}
 	for each(std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
