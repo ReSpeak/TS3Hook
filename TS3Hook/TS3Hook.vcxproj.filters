@@ -17,7 +17,7 @@
     <ClInclude Include="PatchTools.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ts3_functions.h">
+    <ClInclude Include="include\ts3_functions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

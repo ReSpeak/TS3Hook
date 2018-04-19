@@ -16,6 +16,7 @@
 extern "C" {
 	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(const struct TS3Functions funcs);
 	PLUGINS_EXPORTDLL void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber);
+	PLUGINS_EXPORTDLL int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char* errorMessage, unsigned int error, const char* returnCode, const char* extraMessage);
 }
 #ifdef ENV32
 #define STD_DECL __cdecl
@@ -72,8 +73,7 @@ WCHAR outsuffix[256];
 WCHAR inprefix[256];
 WCHAR insuffix[256];
 WCHAR bypass_modalquit[3];
-WCHAR in_to_plugincmd[3];
-WCHAR out_to_plugincmd[3];
+WCHAR teaspeak_anti_error[3];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
@@ -143,6 +143,31 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 	}
 }
 
+int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char * errorMessage, unsigned int error, const char * returnCode, const char * extraMessage)
+{
+	if (error == 2)
+		printf("error == 2\n");
+	if (strcmp(errorMessage, "not implemented") == 0)
+		printf("strcmp(errorMessage, \"not implemented\") == 0\n");
+	if (wcscmp(L"1", teaspeak_anti_error) == 0)
+		printf("wcscmp(L\"1\", teaspeak_anti_error) == 0\n");
+	if (error == 2 && strcmp(errorMessage, "not implemented") == 0 && wcscmp(L"1", teaspeak_anti_error) == 0) {
+		printf("all 3\n");
+		return 1;
+		char *serverVersion;
+		if (ts3_functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_VERSION, &serverVersion) == 0) {
+			for (; *serverVersion; ++serverVersion) *serverVersion = tolower(*serverVersion);
+			if (strstr(serverVersion, "teaspeak") != NULL) {
+				ts3_functions.freeMemory(serverVersion);
+				return 1;
+			}
+			ts3_functions.freeMemory(serverVersion);
+		}
+	}
+	printf("return 0\n");
+	return 0;
+}
+
 void create_config(const LPCWSTR file_name)
 {
 	WritePrivateProfileString(lpSection, L"outprefix", L"[OUT]", file_name);
@@ -152,7 +177,8 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"blockcmds", L"connectioninfoautoupdate,setconnectioninfo,clientchatcomposing", file_name);
 	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
-	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name);
+	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name); 
+	WritePrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", file_name);
 	//printf("%sCreated config %ls\n", prefix, file_name);
 }
 
@@ -209,6 +235,8 @@ void read_config()
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
+	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"1", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
+	GetPrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", teaspeak_anti_error, sizeof(teaspeak_anti_error), lpFileName);
 }
 
 bool core_hook()
@@ -235,7 +263,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 	if (find_pos_inits != std::string::npos) {
 		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
 		const auto virtualserver_hostmessage_set = buffer.find("virtualserver_hostmessage=");
-		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos) {
+		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
 			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
 			ts3_functions.printMessageToCurrentTab("TS3Hook: The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[/color], but you can stay connected ;)");
 			modified = true;
