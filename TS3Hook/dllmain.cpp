@@ -153,9 +153,7 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"blockcmds", L"connectioninfoautoupdate,setconnectioninfo,clientchatcomposing", file_name);
 	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
 	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name);
-	WritePrivateProfileString(lpSection, L"in_to_plugincmd", L"0", file_name);
-	WritePrivateProfileString(lpSection, L"out_to_plugincmd", L"0", file_name);
-	printf("%sCreated config %ls\n", prefix, file_name);
+	//printf("%sCreated config %ls\n", prefix, file_name);
 }
 
 void replace_all(std::string& str, const std::string& from, const std::string& to) {
@@ -180,9 +178,10 @@ void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out,
 
 void read_config()
 {
-	if (!file_exists(lpFileName))
+	if (!file_exists(lpFileName)) {
+		CWRITE(CYELLOW, "Make sure to start your Teamspeak Client as admin atleast once to create \"HookConf.ini\"!\n");
 		create_config(lpFileName);
-
+	}
 	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
 	//CONFSETT(outprefix, ls);
 	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
@@ -204,15 +203,12 @@ void read_config()
 	for (const auto &cmd : blockcmds)
 		CWRITE(CYELLOW, "%s,", cmd.c_str());
 	printf("\n");
-	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, clientver, '|');
 	if (!clientver.empty()) {
 		replace_all(clientver[0], " ", R"(\s)");
 		replace_all(clientver[2], "/", R"(\/)");
 	}
-	GetPrivateProfileString(lpSection, L"in_to_plugincmd", L"", in_to_plugincmd, sizeof(in_to_plugincmd), lpFileName);
-	GetPrivateProfileString(lpSection, L"out_to_plugincmd", L"", out_to_plugincmd, sizeof(out_to_plugincmd), lpFileName);
 }
 
 bool core_hook()
@@ -233,18 +229,15 @@ bool core_hook()
 void STD_DECL log_in_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
-	if (wcscmp(L"1", in_to_plugincmd) == 0) {
-		ts3_functions.logMessage(packet, LogLevel_DEBUG, "TS3Hook IN", 0);
-	}
 	const auto find_pos_inits = buffer.find(initserver);
 	bool modified = false;
 	auto in_str = buffer;
 	if (find_pos_inits != std::string::npos) {
 		const auto virtualserver_hostmessage_mode = buffer.find("virtualserver_hostmessage_mode=3");
 		const auto virtualserver_hostmessage_set = buffer.find("virtualserver_hostmessage=");
-		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos && wcscmp(L"1", bypass_modalquit) == 0) {
+		if (virtualserver_hostmessage_mode != std::string::npos && virtualserver_hostmessage_set != std::string::npos) {
 			replace_all(in_str, "virtualserver_hostmessage_mode=3", "virtualserver_hostmessage_mode=2");
-			ts3_functions.printMessageToCurrentTab("TS3Hook: [color=green]The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[color=green], but you can stay connected ;)");
+			ts3_functions.printMessageToCurrentTab("TS3Hook: The server you're connecting to has it's hostmessage mode set to [color=red]MODALQUIT[/color], but you can stay connected ;)");
 			modified = true;
 		}
 	}
@@ -262,21 +255,6 @@ void STD_DECL log_in_packet(char* packet, int length)
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	const auto buffer = std::string(packet, length);
-	if (wcscmp(L"1", out_to_plugincmd) == 0) {
-		/* ts3_functions.logMessage(buffer.c_str(), LogLevel_DEVEL, "TS3Hook OUT", 1);
-		
-		uint64* list;
-		ts3_functions.getServerConnectionHandlerList(&list);
-		for (unsigned int a = 0; a < sizeof(texts) / sizeof(texts[0]); a = a + 1)
-		//for (const uint64 &schid : list) {
-
-		}*/
-		/*string a = "TS3Hook: ";
-		const char *b = "world";
-		a += b;
-		const char *C = a.c_str();
-		ts3_functions.printMessageToCurrentTab(buffer.c_str());*/
-	}
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
 	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
@@ -311,7 +289,13 @@ void STD_DECL log_out_packet(char* packet, int length)
 			in_str.insert(client_version_sign + 20, clientver[2]);
 		}
 		if (!clientver[1].empty()) {
-			in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+			long length_check = (client_input_muted - client_platform - 17);
+
+			if (length_check > 0)
+				in_str.erase(client_platform + 16, (client_input_muted - client_platform - 17));
+			else
+				in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
+
 			in_str.insert(client_platform + 16, clientver[1]);
 		}
 		if (!clientver[0].empty()) {
