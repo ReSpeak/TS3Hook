@@ -145,14 +145,7 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 
 int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char * errorMessage, unsigned int error, const char * returnCode, const char * extraMessage)
 {
-	if (error == 2)
-		printf("error == 2\n");
-	if (strcmp(errorMessage, "not implemented") == 0)
-		printf("strcmp(errorMessage, \"not implemented\") == 0\n");
-	if (wcscmp(L"1", teaspeak_anti_error) == 0)
-		printf("wcscmp(L\"1\", teaspeak_anti_error) == 0\n");
 	if (error == 2 && strcmp(errorMessage, "not implemented") == 0 && wcscmp(L"1", teaspeak_anti_error) == 0) {
-		printf("all 3\n");
 		return 1;
 		char *serverVersion;
 		if (ts3_functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_VERSION, &serverVersion) == 0) {
@@ -164,7 +157,6 @@ int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char * 
 			ts3_functions.freeMemory(serverVersion);
 		}
 	}
-	printf("return 0\n");
 	return 0;
 }
 
