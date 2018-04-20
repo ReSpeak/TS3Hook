@@ -84,6 +84,8 @@ const std::string sendtextmessage("sendtextmessage ");
 const std::string notifytextmessage("notifytextmessage ");
 const std::string hostmsg_mode("virtualserver_hostmessage_mode=3");
 const std::string not_implemented("error id=2 msg=not\\simplemented");
+const char bell_char = 0x07;
+const std::string bell = std::string(1, bell_char);
 static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
@@ -240,7 +242,10 @@ bool core_hook()
 
 void STD_DECL log_in_packet(char* packet, int length)
 {
-	const auto buffer = std::string(packet, length);
+	auto buffer = std::string(packet, length);
+	replace_all(buffer, bell, "");
+	memcpy(packet, buffer.c_str(), buffer.length());
+	memset(packet + buffer.length(), ' ', length - buffer.length());
 	const auto find_pos_inits = buffer.find("initserver ");
 	const auto find_pos_err = buffer.find(not_implemented);
 	const auto find_pos_outject = buffer.find(outjectcmd);
@@ -252,6 +257,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 		const auto in_off = find_pos_outject + outjectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 		replace_all(in_str, std::string("~s"), std::string(" "));
+		replace_all(in_str, std::string("\\s"), std::string("\s"));
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 		modified = true;
@@ -284,7 +290,10 @@ void STD_DECL log_in_packet(char* packet, int length)
 
 void STD_DECL log_out_packet(char* packet, int length)
 {
-	const auto buffer = std::string(packet, length);
+	auto buffer = std::string(packet, length);
+	replace_all(buffer, bell, "");
+	memcpy(packet, buffer.c_str(), buffer.length());
+	memset(packet + buffer.length(), ' ', length - buffer.length());
 	const auto find_pos_inject = buffer.find(injectcmd);
 	const auto find_pos_cinit = buffer.find(clientinit);
 	const auto find_pos_sendcmd = buffer.find(sendtextmessage);
