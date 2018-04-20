@@ -87,6 +87,8 @@ const std::string not_implemented("error id=2 msg=not\\simplemented");
 const char bell_char = 0x07;
 const std::string bell = std::string(1, bell_char);
 static struct TS3Functions ts3_functions;
+const char bell_char = 0x07;
+const std::string bell = std::string(1, bell_char);
 anyID myID;
 uint64 cid;
 
