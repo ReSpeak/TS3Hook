@@ -165,6 +165,7 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
 	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name); 
 	WritePrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", file_name);
+	WritePrivateProfileString(lpSection, L"useunicode", L"1", file_name);
 	//printf("%sCreated config %ls\n", prefix, file_name);
 }
 
@@ -223,6 +224,13 @@ void read_config()
 	}
 	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"1", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
 	GetPrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", teaspeak_anti_error, sizeof(teaspeak_anti_error), lpFileName);
+	wchar_t useunicode[1];
+	GetPrivateProfileString(lpSection, L"useunicode", L"1", useunicode, sizeof(useunicode), lpFileName);
+	if (wcscmp(useunicode, L"1") == 0) {
+		SetConsoleOutputCP(65001);
+		CWRITE(CCYAN, "Using UTF-8 encoding");
+		printf("\n");
+	}
 }
 
 bool core_hook()
