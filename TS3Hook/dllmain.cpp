@@ -1,6 +1,6 @@
 ﻿// dllmain.cpp : Defines the entry point for the DLL application.
 #include "main.h"
-#include "include/ts3_functions.h"
+#include "util.h"
 #include <cstdio>
 #include "PatchTools.h"
 #include <string>
@@ -8,16 +8,7 @@
 #include <sstream>
 #include <iterator>
 #include <fstream>
-#include <algorithm>
 
-#define PLUGINS_EXPORTDLL __declspec(dllexport)
-
-// Plugin exports
-extern "C" {
-	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(const struct TS3Functions funcs);
-	PLUGINS_EXPORTDLL void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber);
-	PLUGINS_EXPORTDLL int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char* errorMessage, unsigned int error, const char* returnCode, const char* extraMessage);
-}
 #ifdef ENV32
 #define STD_DECL __cdecl
 
@@ -95,23 +86,6 @@ uint64 cid;
 	} else {\
 		printf("%sFor "#var" using: %"#form"\n", prefix, var);\
 	}
-
-std::string random_string(size_t length)
-{
-	auto randchar = []() -> char
-	{
-		const char charset[] =
-			"0123456789"
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			"abcdefghijklmnopqrstuvwxyz";
-		const size_t max_index = (sizeof(charset) - 1);
-		return charset[rand() % max_index];
-	};
-	std::string str(length, 0);
-	std::generate_n(str.begin(), length, randchar);
-	return str;
-}
-
 
 template<typename Out>
 void split(const std::string &s, const char delim, Out result) {
@@ -218,9 +192,10 @@ void read_config()
 	printf("\n");
 	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, clientver, '|');
-	if (!clientver.empty()) {
-		replace_all(clientver[0], " ", R"(\s)");
-		replace_all(clientver[2], "/", R"(\/)");
+	for (auto &versionpart : clientver)
+	{
+		replace_all(versionpart, " ", R"(\s)");
+		replace_all(versionpart, "/", R"(\/)");
 	}
 	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"1", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
 	GetPrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", teaspeak_anti_error, sizeof(teaspeak_anti_error), lpFileName);
@@ -265,7 +240,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 		const auto in_off = find_pos_outject + outjectcmd.size();
 		auto in_str = std::string(packet + in_off, length - in_off);
 		replace_all(in_str, std::string("~s"), std::string(" "));
-		replace_all(in_str, std::string("\\s"), std::string("\s"));
+		replace_all(in_str, std::string("\\\\s"), std::string("\\s"));
 		memcpy(packet, in_str.c_str(), in_str.length());
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 		modified = true;

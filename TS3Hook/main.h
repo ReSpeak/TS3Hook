@@ -6,6 +6,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 #include <Windows.h>
+#include "include/ts3_functions.h"
 
 #if _WIN32 || _WIN64
 #if _WIN64
@@ -70,6 +71,9 @@ extern "C" {
 	PLUGINS_EXPORTDLL const char* ts3plugin_description();
 	PLUGINS_EXPORTDLL int ts3plugin_init();
 	PLUGINS_EXPORTDLL void ts3plugin_shutdown();
+	PLUGINS_EXPORTDLL void ts3plugin_setFunctionPointers(const struct TS3Functions funcs);
+	PLUGINS_EXPORTDLL void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int newStatus, unsigned int errorNumber);
+	PLUGINS_EXPORTDLL int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char* errorMessage, unsigned int error, const char* returnCode, const char* extraMessage);
 }
 
 #endif // MAIN_H

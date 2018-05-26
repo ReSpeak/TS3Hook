@@ -47,6 +47,15 @@ SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
 	return NULL;
 }
 
+void PatchBytes(const PBYTE pAddress, const BYTE overwrite[], const SIZE_T dwLen)
+{
+	DWORD dwOldProtect, dwBkup;
+	VirtualProtect(pAddress, dwLen, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	for (SIZE_T x = 0x0; x < dwLen; x++)
+		pAddress[x] = overwrite[x];
+	VirtualProtect(pAddress, dwLen, dwOldProtect, &dwBkup);
+}
+
 #ifdef ENV32
 void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 {

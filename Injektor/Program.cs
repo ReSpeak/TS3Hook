@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -16,11 +17,14 @@ namespace Injector
 
 		static void Main(string[] args)
 		{
-			DoHax();
-			Console.ReadKey();
+			bool autoclose = args.Contains("--autoclose");
+
+			var ok = DoHax();
+			if (!autoclose || !ok)
+				Console.ReadKey();
 		}
 
-		static void DoHax()
+		static bool DoHax()
 		{
 			Process[] procs;
 			do
@@ -53,6 +57,7 @@ namespace Injector
 			string res = DllInjector.Inject(proc, @"TS3Hook.dll");
 			Console.WriteLine("Status = {0}", res ?? "OK");
 			Console.WriteLine("Done");
+			return res == null;
 		}
 	}
 

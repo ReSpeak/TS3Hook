@@ -1,4 +1,4 @@
-#include "stdio.h"
+#include <cstdio>
 #include "main.h"
 #include "PatchTools.h"
 
