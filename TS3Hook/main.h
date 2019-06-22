@@ -45,8 +45,10 @@ extern "C"
 	void packet_in_hook1();
 	void packet_out_hook1();
 #ifdef ENV64
+	void packet_in_hook2();
 	void packet_out_hook2();
 	void packet_out_hook3();
+	void packet_out_hook4();
 #endif
 }
 

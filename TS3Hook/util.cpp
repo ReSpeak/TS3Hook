@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <algorithm>
 #include <string>
+#include <tuple>
 
 char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
@@ -28,4 +29,15 @@ std::string random_string(size_t length)
 	std::string str(length, 0);
 	std::generate_n(str.begin(), length, randchar);
 	return str;
+}
+
+// (start, length)
+std::tuple<size_t, size_t> find_param(std::string str, const char* ptr)
+{
+	const auto start = str.find(ptr) + strlen(ptr);
+	const auto end = str.find(" ", start);
+	if (end == std::string::npos)
+		return std::make_tuple(start, str.length() - start);
+	else
+		return std::make_tuple(start, end - start);
 }

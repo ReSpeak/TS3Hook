@@ -50,7 +50,7 @@ packet_in_hook1 proc
 	; Restore origial
 	MOV     rcx, [r14+80]
 	MOV     rax, [rcx]
-	MOV     byte ptr [rsp+32], 0
+	MOV     BYTE PTR [rsp+32], 0
 	MOV     r9, [r14+88]
 	MOV     r8, r14
 	MOV     rdx, rbx
@@ -70,6 +70,31 @@ packet_in_hook1 proc
 
 	JMP     packet_in_hook_return
 packet_in_hook1 endp
+
+packet_in_hook2 proc
+	; Restore origial
+	MOV     rcx, [r15+80]
+	MOV     rax, [rcx]
+	MOV     BYTE PTR [rsp+32], 0
+	MOV     r9, [r15+88]
+	MOV     r8, r15
+	MOV     rdx, rbx
+
+	pushaq
+	SUB rsp, 32
+
+	; Log in-packet
+	MOV     rcx, QWORD PTR [rdx+8]
+	ADD     rcx, 11 ; str
+	MOV     edx, DWORD PTR [rdx+16]
+	SUB     edx, 11 ; len
+	CALL    log_in_packet
+
+	ADD rsp, 32
+	popaq
+
+	JMP     packet_in_hook_return
+packet_in_hook2 endp
 
 packet_out_hook1 proc
 	pushaq
@@ -150,5 +175,28 @@ packet_out_hook3 proc
 
 	JMP     packet_out_hook_return
 packet_out_hook3 endp
+
+packet_out_hook4 proc
+	pushaq
+	SUB rsp, 32
+
+	; Log out-packet
+	MOV     rcx, QWORD PTR [rdi+8]
+	ADD     rcx, 13 ; str
+	MOV     edx, DWORD PTR [rdi+16]
+	SUB     edx, 13 ; len
+	CALL    log_out_packet
+
+	ADD rsp, 32
+	popaq
+
+	; Restore origial
+	MOV     [rbp+2528], eax
+	CMP     eax, r14d
+	SETZ    r12b
+	CMP     BYTE PTR [rsp+64], 0
+
+	JMP     packet_out_hook_return
+packet_out_hook4 endp
 
 END

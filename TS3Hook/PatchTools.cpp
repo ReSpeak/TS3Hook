@@ -1,6 +1,7 @@
 #include "main.h"
 #include <Windows.h>
 #include <Psapi.h>
+#include <cstdio>
 
 MODULEINFO GetModuleInfo(const LPCWSTR szModule)
 {
@@ -12,7 +13,7 @@ MODULEINFO GetModuleInfo(const LPCWSTR szModule)
 	return modinfo;
 }
 
-SIZE_T FindPattern(const LPCWSTR module, const char *pattern, const char *mask)
+SIZE_T FindPattern(const LPCWSTR module, const char* pattern, const char* mask)
 {
 	//Get all module related information
 	const MODULEINFO mInfo = GetModuleInfo(module);
@@ -78,12 +79,12 @@ void MakeJMP(const PBYTE pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 	// overwrite the next 4 bytes (which is the size of a DWORD)
 	// with the dwRelAddr
 
-	*reinterpret_cast<SIZE_T *>(pAddress + 0x1) = dwRelAddr;
+	*reinterpret_cast<SIZE_T*>(pAddress + 0x1) = dwRelAddr;
 
 	// overwrite the remaining bytes with the NOP opcode (0x90)
 	// NOP opcode = No OPeration
 
-	for (SIZE_T x = 0x5; x < dwLen; x++) *(pAddress + x) = 0x90;
+	for (SIZE_T x = 0x5; x < dwLen; x++)* (pAddress + x) = 0x90;
 
 	// restore the paged memory permissions saved in dwOldProtect
 
@@ -111,7 +112,7 @@ void MakeJMP(PBYTE const pAddress, const PVOID dwJumpTo, const SIZE_T dwLen)
 	memcpy(pAddress, stub, sizeof(stub));
 
 	for (int i = MinLen; i < dwLen; i++)
-		*reinterpret_cast<BYTE*>(reinterpret_cast<DWORD_PTR>(pAddress) + i) = 0x90;
+		* reinterpret_cast<BYTE*>(reinterpret_cast<DWORD_PTR>(pAddress) + i) = 0x90;
 
 	VirtualProtect(pAddress, dwLen, dwOld, &dwOld);
 }

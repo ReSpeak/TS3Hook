@@ -21,17 +21,20 @@ const char* PATT_OUT_1 = "\xC6\x45\xFC\x06\x80\xF9\x02\x74\x09\x80\xF9\x03";
 const char* MASK_OUT_1 = "xxxxxxxxxxxx";
 #else
 #define STD_DECL
-
-const char* PATT_IN_1 = "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB";
-const char* MASK_IN_1 = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
+hookpt IN_HOOKS[] = {
+	hookpt{ 22, 22, packet_in_hook1, "\x49\x8B\x4E\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4E\x58\x4D\x8B\xC6\x48\x8B\xD3\xFF\x50\x20\xEB", "xxxxxxxxxxxxxxxxxxxxxxxxxx" },
+	hookpt{ 22, 22, packet_in_hook2, "\x49\x8B\x4F\x50\x48\x8B\x01\xC6\x44\x24\x20\x00\x4D\x8B\x4F\x58\x4D\x8B\xC7\x48\x8B\xD3\xFF\x50\x20\x41", "xxxxxxxxxxxxxxxxxxxxxxxxxx" },
+};
 
 hookpt OUT_HOOKS[] = {
-	// "xx?xxxxxxxxx?xxxxx"
-	hookpt{ 18, 18, packet_out_hook1, "\x89\x45\x00\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x44\x80\x7C\x24\x40\x00" ,"xxxxxxxxxxxxxxxxxx" },
-	hookpt{ 18, 18, packet_out_hook2, "\x89\x45\xE0\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x50\x80\x7C\x24\x40\x00" ,"xxxxxxxxxxxxxxxxxx" },
-	hookpt{ 17, 17, packet_out_hook3, "\x48\x8B\x10\x48\x89\x54\x24\x50\x48\x89\x54\x24\x78\x48\x8B\x58\x08", "xxxxxxxxxxxxxxxxx" }
+	hookpt{ 18, 18, packet_out_hook1, "\x89\x45\x00\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x44\x80\x7C\x24\x40\x00", "xxxxxxxxxxxxxxxxxx" },
+	hookpt{ 18, 18, packet_out_hook2, "\x89\x45\xE0\x83\xF8\x01\x0F\x94\xC1\x88\x4C\x24\x50\x80\x7C\x24\x40\x00", "xxxxxxxxxxxxxxxxxx" },
+	hookpt{ 17, 17, packet_out_hook3, "\x48\x8B\x10\x48\x89\x54\x24\x50\x48\x89\x54\x24\x78\x48\x8B\x58\x08", "xxxxxxxxxxxxxxxxx" },
+	hookpt{ 18, 18, packet_out_hook4, "\x89\x85\xE0\x09\x00\x00\x41\x3B\xC6\x41\x0F\x94\xC4\x80\x7C\x24\x40\x00", "xxxxxxxxxxxxxxxxxx" },
 };
 #endif
+
+#define sizeofa(a) (sizeof(a) / sizeof(a[0]))
 
 #define CRED (FOREGROUND_RED | FOREGROUND_INTENSITY)
 #define CGREEN (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
@@ -59,12 +62,12 @@ bool nick_change_needed = false;
 LPCWSTR lpFileName = L".\\HookConf.ini";
 LPCWSTR lpSection = L"Config";
 const char* prefix = "TS3Hook: ";
-WCHAR outprefix[256];
-WCHAR outsuffix[256];
-WCHAR inprefix[256];
-WCHAR insuffix[256];
-WCHAR bypass_modalquit[3];
-WCHAR teaspeak_anti_error[3];
+wchar_t outprefix[256];
+wchar_t outsuffix[256];
+wchar_t inprefix[256];
+wchar_t insuffix[256];
+wchar_t bypass_modalquit[3];
+wchar_t teaspeak_anti_error[3];
 std::vector<std::string> ignorecmds;
 std::vector<std::string> blockcmds;
 std::vector<std::string> clientver;
@@ -75,8 +78,8 @@ const std::string sendtextmessage("sendtextmessage ");
 const std::string notifytextmessage("notifytextmessage ");
 const std::string hostmsg_mode("virtualserver_hostmessage_mode=3");
 const std::string not_implemented("error id=2 msg=not\\simplemented");
-const char bell_char = 0x07;
-const std::string bell = std::string(1, bell_char);
+const std::string bell = std::string(1, '\a');
+const std::string null_str = std::string(1, '\0');
 static struct TS3Functions ts3_functions;
 anyID myID;
 uint64 cid;
@@ -88,7 +91,7 @@ uint64 cid;
 	}
 
 template<typename Out>
-void split(const std::string &s, const char delim, Out result) {
+void split(const std::string& s, const char delim, Out result) {
 	std::stringstream ss(s);
 	std::string item;
 	while (std::getline(ss, item, delim)) {
@@ -96,7 +99,7 @@ void split(const std::string &s, const char delim, Out result) {
 	}
 }
 
-std::vector<std::string> split(const std::string &s, const char delim) {
+std::vector<std::string> split(const std::string& s, const char delim) {
 	std::vector<std::string> elems;
 	split(s, delim, std::back_inserter(elems));
 	return elems;
@@ -121,7 +124,7 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 	}
 }
 
-int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char * errorMessage, unsigned int error, const char * returnCode, const char * extraMessage)
+int ts3plugin_onServerErrorEvent(uint64 serverConnectionHandlerID, const char* errorMessage, unsigned int error, const char* returnCode, const char* extraMessage)
 {
 	if (strcmp(returnCode, "th") == 0)
 		return 1;
@@ -137,7 +140,7 @@ void create_config(const LPCWSTR file_name)
 	WritePrivateProfileString(lpSection, L"ignorecmds", L"", file_name);
 	WritePrivateProfileString(lpSection, L"blockcmds", L"connectioninfoautoupdate,setconnectioninfo,clientchatcomposing", file_name);
 	WritePrivateProfileString(lpSection, L"clientversion", L"3.?.? [Build: 5680278000]|Windows|DX5NIYLvfJEUjuIbCidnoeozxIDRRkpq3I9vVMBmE9L2qnekOoBzSenkzsg2lC9CMv8K5hkEzhr2TYUYSwUXCg==", file_name);
-	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name); 
+	WritePrivateProfileString(lpSection, L"bypass_modalquit", L"1", file_name);
 	WritePrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", file_name);
 	WritePrivateProfileString(lpSection, L"useunicode", L"1", file_name);
 	//printf("%sCreated config %ls\n", prefix, file_name);
@@ -154,7 +157,7 @@ void replace_all(std::string& str, const std::string& from, const std::string& t
 }
 
 template<size_t Size>
-void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string> &out, char split_char)
+void read_split_list(wchar_t(&splitbuffer)[Size], std::vector<std::string>& out, char split_char)
 {
 	char outbuffer[Size];
 	size_t converted;
@@ -169,38 +172,38 @@ void read_config()
 		CWRITE(CYELLOW, "Make sure to start your Teamspeak Client as admin atleast once to create \"HookConf.ini\"!\n");
 		create_config(lpFileName);
 	}
-	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeof(outprefix), lpFileName);
+	GetPrivateProfileString(lpSection, L"outprefix", L"[OUT]", outprefix, sizeofa(outprefix), lpFileName);
 	//CONFSETT(outprefix, ls);
-	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeof(outsuffix), lpFileName);
+	GetPrivateProfileString(lpSection, L"outsuffix", L"", outsuffix, sizeofa(outsuffix), lpFileName);
 	//CONFSETT(outsuffix, ls);
-	GetPrivateProfileString(lpSection, L"inprefix", L"[IN ]", inprefix, sizeof(inprefix), lpFileName);
+	GetPrivateProfileString(lpSection, L"inprefix", L"[IN ]", inprefix, sizeofa(inprefix), lpFileName);
 	//CONFSETT(inprefix, ls);
-	GetPrivateProfileString(lpSection, L"insuffix", L"", insuffix, sizeof(insuffix), lpFileName);
+	GetPrivateProfileString(lpSection, L"insuffix", L"", insuffix, sizeofa(insuffix), lpFileName);
 	//CONFSETT(insuffix, ls);
 	wchar_t splitbuffer[4096];
-	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	GetPrivateProfileString(lpSection, L"ignorecmds", L"", splitbuffer, sizeofa(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, ignorecmds, ',');
 	CWRITE(CCYAN, "%sIgnoring ", prefix);
-	for (const auto &cmd : ignorecmds)
+	for (const auto& cmd : ignorecmds)
 		CWRITE(CCYAN, "%s,", cmd.c_str());
 	printf("\n");
-	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	GetPrivateProfileString(lpSection, L"blockcmds", L"", splitbuffer, sizeofa(splitbuffer), lpFileName);
 	CWRITE(CYELLOW, "%sBlocking ", prefix);
 	read_split_list(splitbuffer, blockcmds, ',');
-	for (const auto &cmd : blockcmds)
+	for (const auto& cmd : blockcmds)
 		CWRITE(CYELLOW, "%s,", cmd.c_str());
 	printf("\n");
-	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeof(splitbuffer), lpFileName);
+	GetPrivateProfileString(lpSection, L"clientversion", L"", splitbuffer, sizeofa(splitbuffer), lpFileName);
 	read_split_list(splitbuffer, clientver, '|');
-	for (auto &versionpart : clientver)
+	for (auto& versionpart : clientver)
 	{
 		replace_all(versionpart, " ", R"(\s)");
 		replace_all(versionpart, "/", R"(\/)");
 	}
-	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"1", bypass_modalquit, sizeof(bypass_modalquit), lpFileName);
-	GetPrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", teaspeak_anti_error, sizeof(teaspeak_anti_error), lpFileName);
+	GetPrivateProfileString(lpSection, L"bypass_modalquit", L"1", bypass_modalquit, sizeofa(bypass_modalquit), lpFileName);
+	GetPrivateProfileString(lpSection, L"teaspeak_anti_error", L"1", teaspeak_anti_error, sizeofa(teaspeak_anti_error), lpFileName);
 	wchar_t useunicode[1];
-	GetPrivateProfileString(lpSection, L"useunicode", L"1", useunicode, sizeof(useunicode), lpFileName);
+	GetPrivateProfileString(lpSection, L"useunicode", L"1", useunicode, sizeofa(useunicode), lpFileName);
 	if (wcscmp(useunicode, L"1") == 0) {
 		SetConsoleOutputCP(65001);
 		CWRITE(CCYAN, "Using UTF-8 encoding");
@@ -264,7 +267,7 @@ void STD_DECL log_in_packet(char* packet, int length)
 		memset(packet + in_str.length(), ' ', length - in_str.length());
 		modified = true;
 	}
-	for each(std::string filter in ignorecmds) {
+	for each (std::string filter in ignorecmds) {
 		if (!buffer.compare(0, filter.size(), filter))
 			return;
 	}
@@ -274,7 +277,8 @@ void STD_DECL log_in_packet(char* packet, int length)
 void STD_DECL log_out_packet(char* packet, int length)
 {
 	auto buffer = std::string(packet, length);
-	replace_all(buffer, bell, "");
+	replace_all(buffer, "\a", "_");
+	replace_all(buffer, null_str, "_");
 	memcpy(packet, buffer.c_str(), buffer.length());
 	memset(packet + buffer.length(), ' ', length - buffer.length());
 	const auto find_pos_inject = buffer.find(injectcmd);
@@ -296,63 +300,51 @@ void STD_DECL log_out_packet(char* packet, int length)
 	}
 	else if (find_pos_cinit != std::string::npos && find_pos_sendcmd == std::string::npos && !clientver.empty())
 	{
-		const auto client_ver = buffer.find("client_version=");
-		const auto client_platform = buffer.find("client_platform=");
-		const auto client_version_sign = buffer.find("client_version_sign=");
-		const auto client_key_offset = buffer.find("client_key_offset=");
-		const auto client_input_hardware = buffer.find("client_input_hardware=");
-		const auto client_output_hardware = buffer.find("client_output_hardware="); // TODO
-		const auto client_input_muted = buffer.find("client_input_muted="); // TODO
-		const auto client_output_muted = buffer.find("client_output_muted="); // TODO
-		const auto client_nickname = buffer.find("client_nickname=");
+		const auto client_ver = find_param(buffer, "client_version=");
+		const auto client_platform = find_param(buffer, "client_platform=");
+		const auto client_version_sign = find_param(buffer, "client_version_sign=");
+		const auto client_nickname = find_param(buffer, "client_nickname=");
 		auto in_str = buffer;
 		if (!clientver[2].empty()) {
-			in_str.erase(client_version_sign + 20, client_key_offset - client_version_sign - 21);
-			in_str.insert(client_version_sign + 20, clientver[2]);
+			in_str.erase(std::get<0>(client_version_sign), std::get<1>(client_version_sign));
+			in_str.insert(std::get<0>(client_version_sign), clientver[2]);
 		}
 		if (!clientver[1].empty()) {
-			long length_check = (client_input_muted - client_platform - 17);
-
-			if (length_check > 0)
-				in_str.erase(client_platform + 16, (client_input_muted - client_platform - 17));
-			else
-				in_str.erase(client_platform + 16, (client_input_hardware - client_platform - 17));
-
-			in_str.insert(client_platform + 16, clientver[1]);
+			in_str.erase(std::get<0>(client_platform), std::get<1>(client_platform));
+			in_str.insert(std::get<0>(client_platform), clientver[1]);
 		}
 		if (!clientver[0].empty()) {
-			in_str.erase(client_ver + 15, (client_platform - client_ver - 16));
-			in_str.insert(client_ver + 15, clientver[0]);
+			in_str.erase(std::get<0>(client_ver), std::get<1>(client_ver));
+			in_str.insert(std::get<0>(client_ver), clientver[0]);
 		}
-		auto nickname_length = (client_ver - client_nickname - 17);
-		
-		const auto length_difference = buffer.size() - in_str.size();
+
+		const auto length_difference = (long)buffer.size() - (long)in_str.size();
 		if (length_difference >= 0) {
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
 		}
-		else if (nickname_length > 3 && length_difference + nickname_length >= 0) {
-			nickname = in_str.substr(client_nickname + 16, (client_ver - client_nickname - 17));
+		else if (length_difference + (long)std::get<1>(client_nickname) - 3 >= 0) {
+			nickname = in_str.substr(std::get<0>(client_nickname), std::get<1>(client_nickname));
 			replace_all(nickname, R"(\s)", " ");
 			nick_change_needed = true;
-			in_str.erase(client_nickname + 16, (client_ver - client_nickname - 17));
-			in_str.insert(client_nickname + 16, random_string(3));
+			in_str.erase(std::get<0>(client_nickname), std::get<1>(client_nickname));
+			in_str.insert(std::get<0>(client_nickname), random_string(3));
 			memcpy(packet, in_str.c_str(), in_str.length());
 			memset(packet + in_str.length(), ' ', length - in_str.length());
 		}
 		else {
-			printf("[INFO] Couldn't set fake platform\n");
+			printf("[INFO] Couldn't set fake platform. Choose a longer nickname.\n");
 		}
 
 		injected = true;
 	}
 	else
 	{
-		for each(std::string filter in ignorecmds) {
+		for each (std::string filter in ignorecmds) {
 			if (!buffer.compare(0, filter.size(), filter))
 				return;
 		}
-		for each(std::string filter in blockcmds) {
+		for each (std::string filter in blockcmds) {
 			if (!buffer.compare(0, filter.size(), filter)) {
 				memset(packet, ' ', length);
 				CWRITE(CYELLOW, "%ls Blocking %s %ls\n", outprefix, filter.c_str(), outsuffix);
@@ -438,13 +430,21 @@ void __declspec(naked) packet_out_hook1()
 #else
 bool try_hook()
 {
-	const auto match_in_1 = FindPattern(MOD, PATT_IN_1, MASK_IN_1);
-	if (match_in_1 == NULL)
-		return false;
+	SIZE_T match_in = NULL;
+	hookpt* pt_in = nullptr;
+	for (hookpt& pt : IN_HOOKS)
+	{
+		match_in = FindPattern(MOD, pt.PATT, pt.MASK);
+		if (match_in != NULL)
+		{
+			pt_in = &pt;
+			break;
+		}
+	}
 
 	SIZE_T match_out = NULL;
 	hookpt* pt_out = nullptr;
-	for (hookpt &pt : OUT_HOOKS)
+	for (hookpt& pt : OUT_HOOKS)
 	{
 		match_out = FindPattern(MOD, pt.PATT, pt.MASK);
 		if (match_out != NULL)
@@ -454,14 +454,14 @@ bool try_hook()
 		}
 	}
 
-	if (match_in_1 != NULL && match_out != NULL)
+	if (match_in != NULL && match_out != NULL)
 	{
-		packet_in_hook_return = match_in_1 + 22;
-		MakeJMP(reinterpret_cast<PBYTE>(match_in_1), packet_in_hook1, 22);
+		packet_in_hook_return = match_in + pt_in->hook_return_offset;
+		MakeJMP(reinterpret_cast<PBYTE>(match_in), pt_in->target_hook, pt_in->hook_length);
 
 		packet_out_hook_return = match_out + pt_out->hook_return_offset;
 		MakeJMP(reinterpret_cast<PBYTE>(match_out), pt_out->target_hook, pt_out->hook_length);
-		CWRITE(CGREEN, "%sHook successfull! (x64 PKGIN: %zX PKGOUT: %zX)\n", prefix, match_in_1, match_out);
+		CWRITE(CGREEN, "%sHook successfull! (x64 PKGIN: %zX PKGOUT: %zX)\n", prefix, match_in, match_out);
 		return true;
 	}
 

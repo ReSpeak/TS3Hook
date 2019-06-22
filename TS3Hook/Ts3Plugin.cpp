@@ -2,10 +2,10 @@
 #include "main.h"
 #include "PatchTools.h"
 
-#define PLUGIN_API_VERSION 22
+#define PLUGIN_API_VERSION 23
 
 const char* ts3plugin_name() { return "TS3Hook"; }
-const char* ts3plugin_version() { return "1.2.5"; }
+const char* ts3plugin_version() { return "1.3.0"; }
 
 int ts3plugin_apiVersion() {
 	int target = -1;
